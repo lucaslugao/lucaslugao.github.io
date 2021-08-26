@@ -1,0 +1,56 @@
+<svg viewbox="-10 -10 120 120">
+  <g><path></path></g>
+</svg>
+<script>
+  const render = (t) => {
+    document
+      .querySelector("path")
+      .setAttributeNS(null, "transform", `rotate(${t / 50},50,50)`);
+    document
+      .querySelector("path")
+      .setAttributeNS(
+        null,
+        "d",
+        `M 0 50 C 0 77.6142 22.3858 100 50 100 C 77.6142 100 100 50 ${
+          60 + 7 * Math.sin(t / 300)
+        } 50 C 100 50 77.6142 0 50 0 C 22.3858 0 0 22.3858 0 50 Z`
+      );
+    window.requestAnimationFrame(render);
+  };
+  render();
+</script>
+<style>
+  @keyframes back {
+    0% {
+      background-color: red;
+    }
+    50% {
+      background-color: blue;
+    }
+    100% {
+      background-color: red;
+    }
+  }
+  @keyframes thing {
+    0% {
+      fill: greenyellow;
+    }
+    50% {
+      fill: hotpink;
+    }
+    100% {
+      fill: greenyellow;
+    }
+  }
+  * {
+    margin: 0;
+    width: 100vw;
+    height: 100vh;
+  }
+  body {
+    animation: back 5s infinite;
+  }
+  path {
+    animation: thing 5s infinite;
+  }
+</style>
