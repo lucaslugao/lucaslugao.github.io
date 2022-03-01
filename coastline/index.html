@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Coastline Paradox</title>
+
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
+      integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
+      crossorigin=""
+    />
+    <script
+      src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
+      integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
+      crossorigin=""
+    ></script>
+
+    <script
+      src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"
+      integrity="sha384-JP5UPxIO2Tm2o79Fb0tGYMa44jkWar53aBoCbd8ah0+LcCDoohTIYr+zIXyfGIJN"
+      crossorigin=""
+    ></script>
+
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css"
+      integrity="sha384-NZLkVuBRMEeB4VeZz27WwTRvlhec30biQ8Xx7zG7JJnkvEKRg5qi6BNbEXo9ydwv"
+      crossorigin=""
+    />
+
+    <script src="https://d3js.org/d3.v4.js"></script>
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+      #map {
+        width: 100vw;
+        height: 50vh;
+        left: 0;
+        top: 0;
+        position: fixed;
+      }
+      #scatter {
+        display: flex;
+        left: 0;
+        bottom: 0;
+        position: fixed;
+        min-width: none;
+        width: 100vw;
+        height: 50vh;
+        background-color: rgb(255, 255, 255);
+      }
+      #scatter svg {
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+    <div id="scatter"></div>
+    <script type="text/javascript">
+      const EARTH_RADIUS = 6378160;
+
+      function ToRadians(input) {
+        return (input / 180.0) * Math.PI;
+      }
+
+      function ComputeSignedArea(path, radius = EARTH_RADIUS) {
+        let size = path.length;
+        if (size < 3) {
+          return 0;
+        }
+        let total = 0;
+        var prev = path[size - 1];
+        let prevTanLat = Math.tan((Math.PI / 2 - ToRadians(prev.lat)) / 2);
+        let prevLng = ToRadians(prev.lng);
+
+        path.forEach((point) => {
+          let tanLat = Math.tan((Math.PI / 2 - ToRadians(point.lat)) / 2);
+          let lng = ToRadians(point.lng);
+          total += PolarTriangleArea(tanLat, lng, prevTanLat, prevLng);
+          prevTanLat = tanLat;
+          prevLng = lng;
+        });
+        return total * (radius * radius);
+      }
+
+      function PolarTriangleArea(tan1, lng1, tan2, lng2) {
+        let deltaLng = lng1 - lng2;
+        let t = tan1 * tan2;
+        return (
+          2 * Math.atan2(t * Math.sin(deltaLng), 1 + t * Math.cos(deltaLng))
+        );
+      }
+
+      const instance = {
+        map: L.map("map").setView([0, 0], 6),
+        geojson: null,
+        target: window.location.hash.substr(1),
+        countries: {},
+        resizeTimeout: null,
+      };
+
+      instance.tiles = L.tileLayer(
+        "https://stamen-tiles.a.ssl.fastly.net/toner/{z}/{x}/{y}.png",
+        {
+          maxZoom: 18,
+          attribution:
+            'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under <a href="http://www.openstreetmap.org/copyright">ODbL</a>.',
+          tileSize: 256,
+        }
+      ).addTo(instance.map);
+
+      function coastlineParadox(coordinates) {
+        const latLng = coordinates.map((c) => L.latLng(c));
+
+        function calculateCoastline(subsamplingFactor, offset = 0) {
+          let total = coordinates.length;
+          let subsampledCoordinates = [];
+
+          let previous = null;
+          let length = 0;
+          let count = 0;
+          for (let i = 0; i < coordinates.length; i++) {
+            if (
+              Math.ceil(i * subsamplingFactor) ==
+              Math.ceil((i + 1) * subsamplingFactor)
+            )
+              continue;
+
+            const current = latLng[i];
+            subsampledCoordinates.push(current);
+            if (previous != null) length += previous.distanceTo(current);
+            count += 1;
+            previous = current;
+          }
+          length += previous.distanceTo(coordinates[0]);
+          return {
+            length: length / 1000,
+            count,
+            area: ComputeSignedArea(subsampledCoordinates) / 1000000,
+          };
+        }
+
+        const coastlineData = [];
+        const numberOfCalculations = Math.min(2000, coordinates.length);
+        for (
+          let i = Math.floor(numberOfCalculations / 3);
+          i <= numberOfCalculations;
+          i++
+        ) {
+          const dataPoint = calculateCoastline(i / numberOfCalculations);
+          coastlineData.push(dataPoint);
+        }
+        console.log(coastlineData[coastlineData.length - 1]);
+        function createPlot(label = "length") {
+          const [width, height] = [300, 300];
+          var svg = d3
+            .select("#scatter")
+            .append("svg")
+            .attr("viewBox", `-50 -50 ${width + 100} ${height + 100}`)
+            .append("g");
+
+          // Add X axis
+          var x = d3
+            .scaleLinear()
+            .domain(d3.extent(coastlineData, (d) => d.count))
+            .nice()
+            .range([0, width]);
+          svg
+            .append("g")
+            .attr("transform", "translate(0," + height + ")")
+            .call(d3.axisBottom(x));
+          svg
+            .append("text")
+            .attr("class", "x label")
+            .attr("text-anchor", "end")
+            .attr("x", width)
+            .attr("y", height - 6)
+            .text("Number of points");
+
+          // Add Y axis
+          var y = d3
+            .scaleLinear()
+            .domain(d3.extent(coastlineData, (d) => d[label]))
+            .nice()
+            .range([height, 0]);
+          svg.append("g").call(d3.axisLeft(y));
+          svg
+            .append("text")
+            .attr("class", "y label")
+            .attr("text-anchor", "end")
+            .attr("y", 6)
+            .attr("dy", ".75em")
+            .attr("transform", "rotate(-90)")
+            .text(label == "length" ? "Border (km)" : "Area (km²)");
+          // Add dots
+          svg
+            .append("g")
+            .selectAll("dot")
+            .data(coastlineData)
+            .enter()
+            .append("circle")
+            .attr("cx", function (d) {
+              return x(d.count);
+            })
+            .attr("cy", function (d) {
+              return y(d[label]);
+            })
+            .attr("r", 1.5)
+            .style("fill", "red");
+        }
+        document.getElementById("scatter").innerHTML = "";
+        createPlot("length");
+        createPlot("area");
+      }
+      function setTarget(isoCode) {
+        if (instance.geojson && instance.target in instance.countries)
+          instance.geojson.resetStyle(
+            instance.countries[instance.target].layer
+          );
+
+        instance.target = isoCode;
+        window.location = "#" + isoCode;
+
+        const { feature, layer } = instance.countries[instance.target];
+        layer.setStyle({
+          weight: 5,
+          color: "black",
+          fillOpacity: 0.7,
+        });
+
+        instance.map.fitBounds(layer.getBounds());
+
+        console.log(feature.geometry.coordinates);
+        const largestGeometry = feature.geometry.coordinates
+          .map((a) => (a.length == 1 ? a[0] : a))
+          .map((a) => [a.length, a])
+          .sort((x, y) => y[0] - x[0])[0][1];
+        coastlineParadox(largestGeometry);
+      }
+      function clickFeature(e) {
+        setTarget(e.target.feature.properties.ISO_A3);
+      }
+
+      function onEachFeature(feature, layer) {
+        layer.on({
+          click: clickFeature,
+        });
+        instance.countries[feature.properties.ISO_A3] = { feature, layer };
+
+        if (feature.properties.ISO_A3 === instance.target) {
+          setTarget(instance.target);
+        }
+      }
+
+      function weakPseudoRandom(seed) {
+        var x = Math.sin(seed++) * 10000;
+        return x - Math.floor(x);
+      }
+      function getColor(feature) {
+        const hue =
+          360 *
+          weakPseudoRandom(
+            feature.properties.ISO_A3.split("")
+              .map((x) => x.charCodeAt(0))
+              .reduce((a, x) => a + x, 0)
+          );
+        return `hsl(${hue}, 100%, 50%)`;
+      }
+      function style(feature) {
+        return {
+          weight: 2,
+          opacity: 1,
+          color: "black",
+          fillOpacity: 0.1,
+          fillColor: getColor(feature),
+        };
+      }
+
+      fetch(localStorage.getItem("geojson") || "custom.geojson")
+        .then((response) => response.json())
+        .then(
+          (data) =>
+            (instance.geojson = L.geoJson(data, {
+              onEachFeature: onEachFeature,
+              style: style,
+            }).addTo(instance.map))
+        );
+      if (instance.target === "") setTarget("DEU");
+    </script>
+  </body>
+</html>
