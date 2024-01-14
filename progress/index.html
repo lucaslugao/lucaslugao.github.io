@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Progress Tracker</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="icon.svg">
+</head>
+
+<body>
+    <div id="container">
+        <div id="header">
+            <h1><img src="icon.svg" width="20px"> Progress Tracker</h1>
+            <p>R to reset</p>
+            <p id="nodata" style="display: block;">No data yet! Touch or type to start</p>
+        </div>
+        <svg id="visualisation" viewBox="0 0 900 250">
+        </svg>
+        <div id="userInputBox">
+            <input name="userInput" id="userInput" value="" type="number" step=".01">
+            <p>% </p>
+        </div>
+    </div>
+    <div id="by">By <a target="_blank" href="https://twitter.com/lucaslugao">@lucaslugao</a></div>
+    <script src="main.js"></script>
+</body>
+
+</html>
