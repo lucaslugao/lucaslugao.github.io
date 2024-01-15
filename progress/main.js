@@ -1,420 +1,447 @@
 (function main() {
-    /** @type {HTMLElement} */
-    const inputBox = document.getElementById("userInputBox");
-    /** @type {HTMLElement} */
-    const userInput = document.getElementById("userInput");
-    /** @type {HTMLElement} */
-    const nodata = document.getElementById("nodata");
-    /** @type {SVGElement} */
-    const visualisation = document.getElementById("visualisation");
-  
-    /**
-     * @type {{ts: Date, pos: number}[]}
-     */
-    const data = [];
-  
-    /** @type {number | null} */
-    let userEnteredPos = null;
-  
-    /**
-     * Create an SVG element with the given tag name and attributes
-     * @param {string} tagName
-     * @param {Object.<string, string>} attributes
-     * @returns {SVGElement}
-     */
-    function createSVGElement(tagName, attributes) {
-      const element = document.createElementNS(
-        "http://www.w3.org/2000/svg",
-        tagName,
-      );
-      for (const key in attributes) {
-        element.setAttribute(key, attributes[key]);
-      }
-      return element;
+  /** @type {HTMLElement} */
+  const inputBox = document.getElementById("userInputBox");
+  /** @type {HTMLElement} */
+  const userInput = document.getElementById("userInput");
+  /** @type {HTMLElement} */
+  const nodata = document.getElementById("nodata");
+  /** @type {SVGElement} */
+  const visualisation = document.getElementById("visualisation");
+  /** @type {{ts: Date, pos: number}[]} */
+  const data = [];
+  /** @type {number | null} */
+  let userEnteredPos = null;
+
+  /**
+   * Creates or updates an SVG element within a given parent element. If an
+   * element with the specified ID does not exist, a new SVG element with that
+   * ID and the specified tag name is created. If it exists, the existing
+   * element is updated with the provided attributes. This function ensures
+   * that the created or updated element is compliant with SVG standards by
+   * using the appropriate namespace.
+   *
+   * @param {SVGElement} parent
+   * @param {string} id
+   * @param {string} tagName
+   * @param {Object.<string, string>} attributes
+   * @returns {SVGElement}
+   */
+  function setElement(parent, id, tagName, attributes) {
+    let element = parent.querySelector(`#${id}`);
+    if (!element) {
+      element = document.createElementNS("http://www.w3.org/2000/svg", tagName);
+      element.id = id;
+      parent.appendChild(element);
     }
-  
-    /**
-     * Create an SVG element with the given tag name and attributes, or update an existing element with the same ID
-     * @param {SVGElement} parent
-     * @param {string} id
-     * @param {string} tagName
-     * @param {Object.<string, string>} attributes
-     * @returns {SVGElement}
-     */
-    function createOrUpdateElement(parent, id, tagName, attributes) {
-      let currentElement = parent.querySelector(`#${id}`);
-      if (currentElement == undefined) {
-        currentElement = createSVGElement(tagName, attributes);
-        currentElement.id = id;
-        parent.appendChild(currentElement);
-      } else {
-        for (const key in attributes) {
-          currentElement.setAttribute(key, attributes[key]);
-        }
-      }
-      return currentElement;
+    for (const key in attributes) {
+      element.setAttribute(key, attributes[key]);
     }
-  
-    /**
-     * Return a human-readable string for the given date relative to now
-     * @param {Date} date
-     * @returns {string}
-     */
-    function friendlyDate(date) {
-      // return a text line like "ETA: 3m 20s"
-      const now = new Date();
-      const diff = date.getTime() - now.getTime();
-      const sign = diff < 0 ? "-" : "";
-      const abs = Math.abs(diff);
-      const seconds = Math.floor(abs / 1000);
-      const minutes = Math.floor(seconds / 60);
-      const hours = Math.floor(minutes / 60);
-      const days = Math.floor(hours / 24);
-  
-      if (seconds == 0) {
-        return "N";
-      }
-      if (seconds < 60) {
-        return `${sign}${seconds}s`;
-      }
-      if (minutes < 60) {
-        return `${sign}${minutes}m`;
-      }
-      if (hours < 24) {
-        return `${sign}${hours}h`;
-      }
-      return `${sign}${days}d ${hours % 24}h`;
+    return element;
+  }
+  function removeElement(parent, id) {
+    let element = parent.querySelector(`#${id}`);
+    if (element) {
+      element.remove();
     }
-  
-    /**
-     * Return a human-readable string for a give ETA date
-     * @param {Date} date
-     * @returns {string}
-     */
-    function friendlyETA(date) {
-      const now = new Date();
-      const diff = date.getTime() - now.getTime();
-      const at = date.toLocaleTimeString([], { seconds: "numeric" });
-  
-      if (diff < 0) {
-        return `Done @ ${at}!`;
-      }
-      const seconds = Math.floor(diff / 1000);
-      const minutes = Math.floor(seconds / 60);
-      const hours = Math.floor(minutes / 60);
-      const days = Math.floor(hours / 24);
-  
-      if (seconds < 60) {
-        return `${seconds}s @ ${at}`;
-      }
-      if (minutes < 60) {
-        return `${minutes}m ${seconds % 60}s @ ${at}`;
-      }
-      if (hours < 24) {
-        return `${hours}h ${minutes % 60}m @ ${at}`;
-      }
-      return `${days}d ${hours % 24}h ${minutes % 60}m ${seconds % 60}s @ ${at}`;
+  }
+  /**
+   * Returns a human-readable string for a given date, either as a relative time difference for past dates
+   * or as a detailed ETA for future dates. For past dates, it shows only the largest time unit greater than zero
+   * (e.g., "3h ago"). For future dates, it provides a detailed ETA with the exact time (e.g., "ETA: 3h 20m 15s @ 15:45").
+   *
+   * @param {Date} date - The date to be converted into a human-readable string.
+   * @param {boolean} ETA - If true, the string will be formatted as a detailed ETA.
+   * @returns {string} A string representing the relative time difference or detailed ETA.
+   */
+  function friendlyDate(date, ETA = false) {
+    const now = new Date();
+    const diff = Math.floor((date.getTime() - now.getTime()) / 1000);
+    const absDiff = Math.abs(diff);
+
+    const units = [60, 60, 24, Number.MAX_SAFE_INTEGER];
+    const unitNames = ["s", "m", "h", "d"];
+    const values = [];
+    let v = absDiff;
+    for (let i = 0; i < units.length; i++) {
+      let value = Math.floor(v) % units[i];
+      if (value > 0) values.unshift(`${value}${unitNames[i]}`);
+      v = (v - value) / units[i];
     }
-  
-    /**
-     * Calculate the ETA based on the last 5 data points
-     * @returns {{nextPoint: {ts: Date, pos: number}, message: string}}
-     */
-    function calculateETA() {
-      // ETA Algorithm based on weighted average of last 5 speeds
-      const now = new Date();
-      const points = data
-        .filter((_, i) => i > data.length - 6)
-        .map((d) => ({
-          x: (d.ts.getTime() - now.getTime()) / 1000,
-          y: d.pos,
-        }));
-  
-      // calculate average speed between last point and each other point
-      const last = points[points.length - 1];
-      const averageSpeeds = points
-        .filter((_, i) => i < points.length - 1)
-        .map(({ x, y }) => {
-          return (last.y - y) / (last.x - x);
-        });
-  
-      let weightedAverageSpeed = 0;
-      let denominator = 0;
-      for (
-        let i = Math.max(0, averageSpeeds.length - 5);
-        i < averageSpeeds.length;
-        i++
-      ) {
-        if (averageSpeeds[i] < 0) continue;
-        const weight = 0.5 ** i;
-        weightedAverageSpeed += weight * averageSpeeds[i];
-        denominator += weight;
-      }
-  
-      if (denominator == 0) {
-        weightedAverageSpeed = 0;
-      } else {
-        weightedAverageSpeed /= denominator;
-        weightedAverageSpeed = Math.max(0, weightedAverageSpeed);
-      }
-  
-      const point = {
-        ts: now,
-        pos: Math.min(100, last.y + weightedAverageSpeed * (0 - last.x)),
-      };
-      let message = "";
-      if (weightedAverageSpeed > 0) {
-        const compl =
-          ((100 - last.y) / weightedAverageSpeed + last.x) * 1000 + now.getTime();
-        message = "ETA: " + friendlyETA(new Date(compl));
-      }
-      return { point, message };
+    if (ETA) {
+      const eta = absDiff > 0 ? values.join(" ") : "...";
+      const atTime = date.toLocaleTimeString([], { seconds: "numeric" });
+      return `ETA: ${eta} @ ${atTime}`;
     }
-  
-    /**
-     * Update the graph
-     */
-    function updateGraph() {
-      let width = visualisation.clientWidth;
-      let height = Math.max(
-        visualisation.style.maxHeight,
-        visualisation.clientHeight,
-      );
-      visualisation.setAttribute("viewBox", `0 0 ${width} ${height}`);
-      createOrUpdateElement(visualisation, "background", "rect", {
-        x: 0,
-        y: 0,
-        width: width,
-        height: height,
-        fill: "var(--elements-bg-color)",
-      });
-  
-      if(data.length == 0){
-        nodata.style.display = "block";
-        return;
+
+    if (values.length == 0 || absDiff < 2) return "N";
+    return "-" + values[0];
+  }
+
+  /**
+   * Calculate the Estimated Time of Arrival (ETA) based on the last n data points
+   * @param {{ts: Date, pos: number}[]} data - Array of data points with timestamp and position
+   * @param {number} n - Number of data points to consider (default is 5)
+   * @returns {{nextPoint: {ts: Date, pos: number}, message: string}}
+   */
+  function calculateETA(data, n = 5) {
+    const now = new Date();
+
+    // Get the most recent n points
+    const recentPoints = data.slice(-n).map((d) => ({
+      x: (d.ts.getTime() - now.getTime()) / 1000,
+      y: d.pos,
+    }));
+
+    const lastPoint = recentPoints[recentPoints.length - 1];
+
+    // Calculate average speeds
+    let averageSpeeds = [];
+    for (let i = 0; i < recentPoints.length - 1; i++) {
+      const { x, y } = recentPoints[i];
+      averageSpeeds.push((lastPoint.y - y) / (lastPoint.x - x));
+    }
+
+    // Calculate weighted average speed
+    let weightedSum = 0;
+    let weightTotal = 0;
+    for (let i = 0; i < averageSpeeds.length; i++) {
+      const speed = averageSpeeds[i];
+      if (speed < 0) continue;
+
+      const weight = Math.pow(0.5, averageSpeeds.length - 1 - i);
+      weightedSum += weight * speed;
+      weightTotal += weight;
+    }
+
+    let weightedAverageSpeed = 0;
+    if (weightTotal !== 0) {
+      weightedAverageSpeed = Math.max(0, weightedSum / weightTotal);
+    }
+
+    // Calculate next point
+    const point = {
+      ts: now,
+      pos: Math.min(
+        100,
+        lastPoint.y + weightedAverageSpeed * (0 - lastPoint.x),
+      ),
+    };
+    let message = "";
+    if (point.pos == 100) {
+      message = "Done!";
+    } else if (weightedAverageSpeed > 0) {
+      const etaTime =
+        ((100 - lastPoint.y) / weightedAverageSpeed + lastPoint.x) * 1000 +
+        now.getTime();
+      message = friendlyDate(new Date(etaTime), true);
+    }
+
+    return { point, message };
+  }
+
+  const LAYOUT = {
+    timeAxisHeight: 30,
+    paddingTop: 40,
+    paddingBottom: 20,
+    paddingHorizontal: 30,
+    width: 800,
+    height: 200,
+  };
+
+  function update() {
+    resizeGraph();
+    updateGraph(data);
+    updateNoData();
+
+    if (localStorage.getItem("smooth") == "true") {
+      requestAnimationFrame(update);
+    } else {
+      clearInterval(update.interval);
+      update.interval = setTimeout(() => update(), 1000);
+    }
+  }
+
+  function resizeGraph() {
+    LAYOUT.width = visualisation.clientWidth;
+    LAYOUT.height = Math.max(
+      visualisation.style.maxHeight,
+      visualisation.clientHeight,
+    );
+    LAYOUT.plotHeight =
+      LAYOUT.height -
+      LAYOUT.timeAxisHeight -
+      LAYOUT.paddingBottom -
+      LAYOUT.paddingTop;
+    LAYOUT.plotWidth = LAYOUT.width - 2 * LAYOUT.paddingHorizontal;
+
+    const vbWidth = visualisation.viewBox.baseVal.width;
+    const vbHeight = visualisation.viewBox.baseVal.height;
+    if (vbWidth == LAYOUT.width && vbHeight == LAYOUT.height) return;
+
+    visualisation.setAttribute(
+      "viewBox",
+      `0 0 ${LAYOUT.width} ${LAYOUT.height}`,
+    );
+    setElement(visualisation, "background", "rect", {
+      x: 0,
+      y: 0,
+      width: LAYOUT.width,
+      height: LAYOUT.height,
+      fill: "var(--elements-bg-color)",
+    });
+    setElement(visualisation, "axis", "line", {
+      x1: 0,
+      y1: LAYOUT.height - LAYOUT.timeAxisHeight,
+      x2: LAYOUT.width,
+      y2: LAYOUT.height - LAYOUT.timeAxisHeight,
+      stroke: "white",
+    });
+  }
+
+  function updateNoData() {
+    nodata.style.display = data.length == 0 ? "block" : "none";
+  }
+  /**
+   * Update the graph
+   * @param {{ts: Date, pos: number}[]} data - Array of data points with timestamp and position
+   */
+  function updateGraph(data) {
+    if (data.length == 0) {
+      return;
+    }
+
+    data = [...data];
+    let ETAMessage = "";
+    let nextPoint = null;
+    if (data.length > 1) {
+      const { point, message } = calculateETA(data);
+      nextPoint = point;
+      ETAMessage = message;
+    }
+    function getPointCount() {
+      if (nextPoint) {
+        return data.length + 1;
       }
-      nodata.style.display = "none";
-  
-      const timeAxisHeight = 30;
-      const paddingTop = 40;
-      const paddingBottom = 20;
-      const paddingHorizontal = 30;
-      const plotHeight = height - timeAxisHeight - paddingBottom - paddingTop;
-      const plotWidth = width - 2 * paddingHorizontal;
-  
-      createOrUpdateElement(visualisation, "axis", "line", {
-        x1: 0,
-        y1: height - timeAxisHeight,
-        x2: width,
-        y2: height - timeAxisHeight,
-        stroke: "white",
-      });
-  
-      let localData = [...data];
-      let ETAMessage = "";
-      if (data.length > 1) {
-        const { point, message } = calculateETA();
-        localData.push(point);
-        ETAMessage = message;
+      return data.length;
+    }
+    function getPoint(index) {
+      if (index == data.length && nextPoint) {
+        return nextPoint;
       }
-      createOrUpdateElement(visualisation, "eta", "text", {
-        x: paddingHorizontal,
-        y: paddingTop,
-        fill: "white",
-        "text-anchor": "start",
-      }).textContent = ETAMessage;
+      return data[index];
+    }
+
+    setElement(visualisation, "eta", "text", {
+      x: LAYOUT.paddingHorizontal,
+      y: LAYOUT.paddingTop,
+      fill: "white",
+      "text-anchor": "start",
+    }).textContent = ETAMessage;
+    if (ETAMessage.length > 0)
       document.title = `${ETAMessage} - Progress Tracker`;
-  
-      const maxPos = Math.max(10, Math.max(...localData.map((d) => d.pos)));
-      let minTs = localData[0].ts.getTime();
-      let maxTs = new Date().getTime();
-      let timeSpan = maxTs - minTs;
-      if (timeSpan == 0) {
-        timeSpan = 1;
-      }
-      if (timeSpan > 1000 * 60 * 10) {
-        minTs = maxTs - 1000 * 60;
-        timeSpan = maxTs - minTs;
-      }
-  
-      function getPointCoordinates(ts, pos) {
-        return {
-          x: paddingHorizontal + (plotWidth * (ts.getTime() - minTs)) / timeSpan,
-          y: paddingTop + plotHeight * (1 - pos / maxPos),
-        };
-      }
-  
-      let lastTickX = null;
-      for (let index of [...localData.keys()].reverse()) {
-        const { ts, pos } = localData[index];
-        const { x, y } = getPointCoordinates(ts, pos);
-  
-        if (index == localData.length - 1) {
-          createOrUpdateElement(visualisation, `e${index}-circle`, "circle", {
-            cx: x,
-            cy: y,
-            r: 5,
-            fill: "white",
-          });
-          createOrUpdateElement(visualisation, `e${index}-circle-text`, "text", {
-            x: x,
-            y: y - 10,
-            fill: "white",
-            "text-anchor": "middle",
-          }).textContent = pos.toFixed(2);
-        } else {
-          createOrUpdateElement(visualisation, `e${index}-circle`, "circle", {
-            cx: x,
-            cy: y,
-            r: 3,
-            fill: "none",
-            stroke: "white",
-          });
-          createOrUpdateElement(
-            visualisation,
-            `e${index}-circle-text`,
-            "text",
-            {},
-          ).textContent = "";
-        }
-  
-        if (lastTickX === null || lastTickX - x > 30) {
-          lastTickX = x;
-          createOrUpdateElement(visualisation, `e${index}-tick-text`, "text", {
-            x: x,
-            y: height - timeAxisHeight + 10,
-            fill: "white",
-            "dominant-baseline": "hanging",
-            "text-anchor": "middle",
-          }).textContent = friendlyDate(ts);
-          createOrUpdateElement(visualisation, `e${index}-tick`, "line", {
-            x1: x,
-            y1: height - timeAxisHeight,
-            x2: x,
-            y2: height - timeAxisHeight + 8,
-            stroke: "white",
-          });
-        } else {
-          createOrUpdateElement(visualisation, `e${index}-tick-text`, "text", {
-            fill: "none",
-          }).textContent = "";
-          createOrUpdateElement(visualisation, `e${index}-tick`, "line", {
-            x1: x,
-            y1: height - timeAxisHeight,
-            x2: x,
-            y2: height - timeAxisHeight + 5,
-            stroke: "white",
-          });
-        }
-      }
+
+    let maxPos = 10;
+    for (let index = 0; index < getPointCount(); index++) {
+      maxPos = Math.max(maxPos, getPoint(index).pos);
     }
-  
-    // Prevent non-numeric input
-  
-    userInput.addEventListener("input", (e) => {
-      let numerical = e.target.value.replace(/[^0-9\.]/g, "");
-      numerical = numerical.replace(/^0+/, "0");
-  
-      let parsedValue = Number(numerical);
-      if (parsedValue > 100) {
-        numerical = userEnteredPos;
-        parsedValue = userEnteredPos;
-      }
-      if (userEnteredPos != parsedValue || e.target.value != numerical) {
-        e.target.value = numerical;
-        userEnteredPos = parsedValue;
-      }
-    });
-  
-    /**
-     * Show the overlay
-     */
-    function showInput() {
-      inputBox.style.display = "flex";
-      userInput.focus();
+    const maxTs = new Date().getTime();
+    const minTs = Math.min(
+      maxTs - 1,
+      Math.max(data[0].ts.getTime(), maxTs - 1000 * 30 * 1),
+    );
+    const timeSpan = maxTs - minTs;
+
+    function getPointCoordinates(ts, pos) {
+      return {
+        x:
+          LAYOUT.paddingHorizontal +
+          (LAYOUT.plotWidth * (ts.getTime() - minTs)) / timeSpan,
+        y: LAYOUT.paddingTop + LAYOUT.plotHeight * (1 - pos / maxPos),
+      };
     }
-  
-    /**
-     * Hide the overlay
-     */
-    function hideInput() {
-      inputBox.style.display = "none";
-      userInput.blur();
-      userEnteredPos = null;
-      userInput.value = "";
-      window.scrollTo(0, 0);
-    }
-  
-    // Event listeners
-  
-    addEventListener("keydown", (e) => {
-      const dismiss = e.key == "Escape";
-      const enter = e.key == "Enter";
-      const reset = e.key.toUpperCase() == "R";
-      const inputBoxVisible = inputBox.style.display != "none";
-  
-      if (reset) {
-        data.length = 0;
-        visualisation.innerHTML = "";
-        document.title = "Progress Tracker";
-        hideInput();
-        updateGraph();
-        return;
+    let lastTickX = null;
+    for (let index = getPointCount() - 1; index >= 0; index--) {
+      const { ts, pos } = getPoint(index);
+      const { x, y } = getPointCoordinates(ts, pos);
+      if (x < -200) {
+        [
+          `e${index}-circle`,
+          `e${index}-circle-text`,
+          `e${index}-tick`,
+          `e${index}-tick-text`,
+        ].forEach((id) => removeElement(visualisation, id));
+        continue;
       }
-  
-      if (dismiss) {
-        hideInput();
-        return;
-      }
-  
-      if (!inputBoxVisible) {
-        showInput();
-        return;
-      }
-  
-      if (enter) {
-        if (userEnteredPos != null) {
-          data.push({ ts: new Date(), pos: userEnteredPos });
-          updateGraph();
-        }
-        hideInput();
-      }
-    });
-  
-    addEventListener("click", (e) => {
-      if (e.target.tagName != "A") {
-        showInput();
-        e.preventDefault();
-      }
-    });
-  
-    addEventListener("resize", updateGraph);
-    addEventListener("load", updateGraph);
-    requestAnimationFrame(updateGraph);
-    setInterval(updateGraph, 1000);
-  
-    // Fake data for testing
-    if (localStorage.getItem("fake") == "true") {
-      data.push({ ts: new Date(Date.now() - 55000), pos: 0 });
-      data.push({ ts: new Date(Date.now() - 45000), pos: 4 });
-      data.push({ ts: new Date(Date.now() - 30000), pos: 9 });
-      data.push({ ts: new Date(Date.now() - 20000), pos: 11 });
-      function generateArtificialDataPoint(delta, v = 1) {
-        let last = 0;
-        if (data.length > 0) {
-          last = data[data.length - 1].pos;
-        }
-        data.push({
-          ts: new Date(),
-          pos: Math.min(
-            100,
-            last + (delta / 1000) * v * (1 + (Math.random() - 0.5) / 2),
-          ),
+
+      if (index == getPointCount() - 1) {
+        setElement(visualisation, `e${index}-circle`, "circle", {
+          cx: x,
+          cy: y,
+          r: 5,
+          fill: "white",
         });
-        let newDelta = 3000 + Math.random() * 2000;
-        setTimeout(() => generateArtificialDataPoint(newDelta), newDelta);
+        setElement(visualisation, `e${index}-circle-text`, "text", {
+          x: x,
+          y: y - 10,
+          fill: "white",
+          "text-anchor": "middle",
+        }).textContent = pos.toFixed(2);
+      } else {
+        setElement(visualisation, `e${index}-circle`, "circle", {
+          cx: x,
+          cy: y,
+          r: 3,
+          fill: "none",
+          stroke: "white",
+        });
+        setElement(
+          visualisation,
+          `e${index}-circle-text`,
+          "text",
+          {},
+        ).textContent = "";
       }
-      generateArtificialDataPoint(1000);
+
+      if (lastTickX === null || lastTickX - x > 30) {
+        lastTickX = x;
+        setElement(visualisation, `e${index}-tick-text`, "text", {
+          x: x,
+          y: LAYOUT.height - LAYOUT.timeAxisHeight + 10,
+          fill: "white",
+          "dominant-baseline": "hanging",
+          "text-anchor": "middle",
+        }).textContent = friendlyDate(ts);
+        setElement(visualisation, `e${index}-tick`, "line", {
+          x1: x,
+          y1: LAYOUT.height - LAYOUT.timeAxisHeight,
+          x2: x,
+          y2: LAYOUT.height - LAYOUT.timeAxisHeight + 8,
+          stroke: "white",
+        });
+      } else {
+        setElement(visualisation, `e${index}-tick-text`, "text", {
+          fill: "none",
+        }).textContent = "";
+        setElement(visualisation, `e${index}-tick`, "line", {
+          x1: x,
+          y1: LAYOUT.height - LAYOUT.timeAxisHeight,
+          x2: x,
+          y2: LAYOUT.height - LAYOUT.timeAxisHeight + 5,
+          stroke: "white",
+        });
+      }
     }
-  })();
-  
+  }
+
+  // Prevent non-numeric input
+  userInput.addEventListener("input", (e) => {
+    let numerical = e.target.value.replace(/[^0-9\.]/g, "");
+    numerical = numerical.replace(/^0+/, "0");
+
+    let parsedValue = Number(numerical);
+    if (parsedValue > 100) {
+      numerical = userEnteredPos;
+      parsedValue = userEnteredPos;
+    }
+    if (userEnteredPos != parsedValue || e.target.value != numerical) {
+      e.target.value = numerical;
+      userEnteredPos = parsedValue;
+    }
+  });
+
+  /**
+   * Show user input
+   */
+  function showInput() {
+    inputBox.style.display = "flex";
+    userInput.focus();
+    update();
+  }
+
+  /**
+   * Hide user input
+   */
+  function hideInput() {
+    inputBox.style.display = "none";
+    userInput.blur();
+    userEnteredPos = null;
+    userInput.value = "";
+    window.scrollTo(0, 0);
+    update();
+  }
+
+  // Event listeners
+
+  addEventListener("keydown", (e) => {
+    const dismiss = e.key == "Escape";
+    const enter = e.key == "Enter";
+    const reset = e.key.toUpperCase() == "R";
+    const inputBoxVisible = inputBox.style.display != "none";
+
+    if (reset) {
+      data.length = 0;
+      visualisation.innerHTML = "";
+      document.title = "Progress Tracker";
+      hideInput();
+      update();
+      return;
+    }
+
+    if (dismiss) {
+      hideInput();
+      return;
+    }
+
+    if (!inputBoxVisible) {
+      showInput();
+      return;
+    }
+
+    if (enter) {
+      if (userEnteredPos != null) {
+        data.push({ ts: new Date(), pos: userEnteredPos });
+        update();
+      }
+      hideInput();
+    }
+  });
+
+  addEventListener("click", (e) => {
+    if (e.target.tagName != "A") {
+      showInput();
+      e.preventDefault();
+    }
+  });
+
+  addEventListener("resize", () => {
+    update();
+  });
+  addEventListener("load", () => {
+    update();
+  });
+  update();
+
+  // Fake data for testing
+  if (localStorage.getItem("fake") == "true") {
+    data.push({ ts: new Date(Date.now() - 55000), pos: 0 });
+    data.push({ ts: new Date(Date.now() - 45000), pos: 4 });
+    data.push({ ts: new Date(Date.now() - 30000), pos: 9 });
+    data.push({ ts: new Date(Date.now() - 20000), pos: 11 });
+    function generateArtificialDataPoint(delta, v = 1) {
+      let last = 0;
+      if (data.length > 0) {
+        last = data[data.length - 1].pos;
+      }
+      data.push({
+        ts: new Date(),
+        pos: Math.min(
+          100,
+          last + (delta / 1000) * v * (1 + (Math.random() - 0.5) / 2),
+        ),
+      });
+      let newDelta = 3000 + Math.random() * 2000;
+      setTimeout(() => generateArtificialDataPoint(newDelta), newDelta);
+    }
+    generateArtificialDataPoint(1000);
+  }
+})();
