@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Impostor do desenho</title>
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%2210 0 100 100%22><text y=%22.90em%22 font-size=%2290%22>✏</text></svg>">
+    </link>
+    <style>
+        * {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 8vw;
+        }
+
+        .small {
+            font-size: 5vw;
+        }
+
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+        }
+
+        #container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        #message {
+            user-select: none;
+            text-align: center;
+            padding-bottom: 5vh;
+        }
+
+        #progress {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 0%;
+            height: 100vh;
+            z-index: 1000;
+            background-color: black;
+            opacity: 0.05;
+        }
+
+        #inputContainer {
+            display: none;
+            justify-content: space-evenly;
+            width: 100%;
+        }
+
+        #inputValue {
+            width: 33%;
+            text-align: center;
+        }
+
+        #inputConfirm {
+            width: 33%;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="container">
+        <div id="progress"></div>
+        <div id="message"></div>
+        <div id="inputContainer">
+            <input autofocus type="number" id="inputValue" value="1" min="1">
+            <button id="inputConfirm">OK</button>
+        </div>
+    </div>
+
+    <script>
+        var palavras = [
+            "pá",
+            "aro",
+            "baú",
+            "dvd",
+            "fax",
+            "fio",
+            "giz",
+            "ímã",
+            "pia",
+            "véu",
+            "arco",
+            "base",
+            "bata",
+            "beca",
+            "bidê",
+            "bóia",
+            "bola",
+            "boné",
+            "bota",
+            "cabo",
+            "cama",
+            "cano",
+            "capa",
+            "cera",
+            "chip",
+            "clip",
+            "cola",
+            "cone",
+            "cruz",
+            "cuia",
+            "dado",
+            "divã",
+            "elmo",
+            "faca",
+            "fita",
+            "gibi",
+            "grua",
+            "iate",
+            "ioiô",
+            "laço",
+            "lata",
+            "leme",
+            "lira",
+            "lona",
+            "luva",
+            "maca",
+            "maiô",
+            "mala",
+            "meia",
+            "mesa",
+            "mola",
+            "oboé",
+            "odre",
+            "pino",
+            "pipa",
+            "pneu",
+            "pote",
+            "puff",
+            "rack",
+            "ralo",
+            "rede",
+            "remo",
+            "roda",
+            "rodo",
+            "saia",
+            "sino",
+            "sofá",
+            "taça",
+            "taco",
+            "tear",
+            "tela",
+            "toga",
+            "tuba",
+            "urna",
+            "vaso",
+            "vela",
+            "xale",
+            "ábaco",
+            "adaga",
+            "agogô",
+            "álbum",
+            "anzol",
+            "apito",
+            "arpão",
+            "baixo",
+            "balão",
+            "balsa",
+            "banco",
+            "banjo",
+            "batom",
+            "berço",
+            "blusa",
+            "blush",
+            "boina",
+            "bolsa",
+            "bomba",
+            "bongô",
+            "botão",
+            "broca",
+            "bucha",
+            "buquê",
+            "burca",
+            "caixa",
+            "calça",
+            "canga",
+            "canoa",
+            "carta",
+            "cesta",
+            "cetro",
+            "chave",
+            "clava",
+            "cocar",
+            "cofre",
+            "coifa",
+            "conga",
+            "corda",
+            "cuíca",
+            "dardo",
+            "dedal",
+            "disco",
+            "draga",
+            "facão",
+            "farda",
+            "fogão",
+            "foice",
+            "forma",
+            "forno",
+            "funil",
+            "fuzil",
+            "gaita",
+            "ganzá",
+            "garfo",
+            "gesso",
+            "gloss",
+            "gorro",
+            "harpa",
+            "jarra",
+            "jeans",
+            "kunai",
+            "lacre",
+            "lança",
+            "lápis",
+            "laquê",
+            "lenço",
+            "lente",
+            "leque",
+            "livro",
+            "lousa",
+            "manta",
+            "modem",
+            "moeda",
+            "motor",
+            "mouse",
+            "mural",
+            "ofurô",
+            "órgão",
+            "papel",
+            "parca",
+            "pasta",
+            "pedal",
+            "pente",
+            "piano",
+            "pilão",
+            "pinça",
+            "pires",
+            "placa",
+            "pluma",
+            "pódio",
+            "porta",
+            "prato",
+            "quepe",
+            "radar",
+            "rádio",
+            "rédea",
+            "régua",
+            "rifle",
+            "rímel",
+            "rolha",
+            "sabão",
+            "sabre",
+            "serra",
+            "short",
+            "spray",
+            "sunga",
+            "sutiã",
+            "tábua",
+            "talco",
+            "tampa",
+            "tanga",
+            "telha",
+            "tênis",
+            "terno",
+            "tiara",
+            "toldo",
+            "touca",
+            "trave",
+            "trono",
+            "tumba",
+            "varal",
+            "vidro",
+            "viola",
+            "zíper",
+            "abajur",
+            "agenda",
+            "agulha",
+            "alarme",
+            "alaúde",
+            "aljava",
+            "âncora",
+            "anilha",
+            "antena",
+            "balaio",
+            "barril",
+            "bastão",
+            "batina",
+            "batuta",
+            "bazuca",
+            "bíblia",
+            "bicama",
+            "biombo",
+            "biruta",
+            "bolero",
+            "boneca",
+            "bornal",
+            "botina",
+            "brinco",
+            "broche",
+            "buzina",
+            "cabide",
+            "caixão",
+            "cajado",
+            "cálice",
+            "calota",
+            "camisa",
+            "caneca",
+            "caneta",
+            "cantil",
+            "canudo",
+            "capelo",
+            "cartão",
+            "casaco",
+            "caxixi",
+            "chapéu",
+            "cinzel",
+            "coador",
+            "colcha",
+            "coldre",
+            "colete",
+            "colher",
+            "cômoda",
+            "concha",
+            "crachá",
+            "cutelo",
+            "diário",
+            "dominó",
+            "enxada",
+            "escova",
+            "escudo",
+            "espada",
+            "espeto",
+            "estaca",
+            "estojo",
+            "fagote",
+            "fivela",
+            "flauta",
+            "flecha",
+            "formão",
+            "frasco",
+            "fronha",
+            "gaiola",
+            "gancho",
+            "gaveta",
+            "grelha",
+            "hélice",
+            "jaleco",
+            "janela",
+            "lajota",
+            "lâmina",
+            "lençol",
+            "luneta",
+            "lustre",
+            "maracá",
+            "mastro",
+            "míssil",
+            "óculos",
+            "pacote",
+            "paletó",
+            "panela",
+            "papete",
+            "pérola",
+            "peruca",
+            "peteca",
+            "pijama",
+            "pincel",
+            "pipeta",
+            "planta",
+            "pomada",
+            "poster",
+            "punhal",
+            "quadro",
+            "rabeca",
+            "rodapé",
+            "sapato",
+            "sirene",
+            "sombra",
+            "suéter",
+            "talher",
+            "tambor",
+            "tanque",
+            "tapete",
+            "tatame",
+            "tecido",
+            "tigela",
+            "tijolo",
+            "toalha",
+            "tobogã",
+            "troféu",
+            "trompa",
+            "túnica",
+            "violão",
+            "webcam",
+            "xícara",
+            "acetona",
+            "aldrava",
+            "algodão",
+            "alicate",
+            "amuleto",
+            "andador",
+            "andaime",
+            "antolho",
+            "aquário",
+            "armário",
+            "azulejo",
+            "balança",
+            "baleiro",
+            "bambolê",
+            "bandana",
+            "baqueta",
+            "barraca",
+            "batente",
+            "bateria",
+            "beliche",
+            "bengala",
+            "bigorna",
+            "bilhete",
+            "biquíni",
+            "bisturi",
+            "cadarço",
+            "cadeado",
+            "cadeira",
+            "caderno",
+            "caixote",
+            "camafeu",
+            "capacho",
+            "cápsula",
+            "carimbo",
+            "carpeta",
+            "cartola",
+            "catraca",
+            "celular",
+            "ceroula",
+            "charuto",
+            "chicote",
+            "chimbal",
+            "chinelo",
+            "chupeta",
+            "colchão",
+            "coleira",
+            "colírio",
+            "collant",
+            "confete",
+            "convite",
+            "corneta",
+            "cornija",
+            "corpete",
+            "cortina",
+            "coturno",
+            "cristal",
+            "echarpe",
+            "edredom",
+            "enxoval",
+            "esmalte",
+            "espelho",
+            "espiral",
+            "esponja",
+            "estátua",
+            "estribo",
+            "flâmula",
+            "foguete",
+            "fosgate",
+            "freezer",
+            "fusível",
+            "galocha",
+            "garrafa",
+            "granada",
+            "gravata",
+            "haltere",
+            "incenso",
+            "jangada",
+            "jaqueta",
+            "lã de aço",
+            "lâmpada",
+            "lampião",
+            "lixeira",
+            "machado",
+            "malhete",
+            "maquete",
+            "marreta",
+            "martelo",
+            "medalha",
+            "miçanga",
+            "mochila",
+            "monitor",
+            "mordaça",
+            "navalha",
+            "orelhão",
+            "origami",
+            "palheta",
+            "pantufa",
+            "pêndulo",
+            "peneira",
+            "penhoar",
+            "perfume",
+            "pistola",
+            "pochete",
+            "polaina",
+            "porta cd",
+            "prancha",
+            "puxador",
+            "quimono",
+            "ralador",
+            "raquete",
+            "rastelo",
+            "relógio",
+            "retrato",
+            "revista",
+            "rosário",
+            "saleiro",
+            "sanfona",
+            "scanner",
+            "seringa",
+            "serrote",
+            "smoking",
+            "talisca",
+            "tamanco",
+            "teclado",
+            "tesoura",
+            "torpedo",
+            "turbina",
+            "vasilha",
+            "violino",
+            "viseira",
+            "vitrola",
+            "volante",
+            "zabumba",
+            "abafador",
+            "alfinete",
+            "almofada",
+            "apagador",
+            "aparador",
+            "armadura",
+            "asa delta",
+            "autorama",
+            "baioneta",
+            "bandeira",
+            "bandolim",
+            "banqueta",
+            "barbante",
+            "berimbau",
+            "bilboquê",
+            "binóculo",
+            "boleador",
+            "bombacha",
+            "borracha",
+            "cabresto",
+            "caçarola",
+            "cachecol",
+            "cachimbo",
+            "calcinha",
+            "camburão",
+            "caminhão",
+            "camiseta",
+            "camisola",
+            "canivete",
+            "capacete",
+            "captador",
+            "carretel",
+            "carrinho",
+            "carteira",
+            "castiçal",
+            "cavalete",
+            "chaleira",
+            "charango",
+            "chaveiro",
+            "chocalho",
+            "chuteira",
+            "chuveiro",
+            "cisterna",
+            "claquete",
+            "cobertor",
+            "compasso",
+            "conduíte",
+            "corsário",
+            "cotonete",
+            "diamante",
+            "disquete",
+            "elástico",
+            "envelope",
+            "escopeta",
+            "esfregão",
+            "espátula",
+            "esquadro",
+            "estilete",
+            "etiqueta",
+            "exaustor",
+            "fantasia",
+            "fantoche",
+            "faqueiro",
+            "farolete",
+            "ferrolho",
+            "fichário",
+            "frigobar",
+            "fruteira",
+            "gabinete",
+            "gangorra",
+            "grinalda",
+            "guitarra",
+            "hidrante",
+            "holofote",
+            "ingresso",
+            "isqueiro",
+            "leiteira",
+            "lembrete",
+            "maçaneta",
+            "maçarico",
+            "manequim",
+            "manivela",
+            "megafone",
+            "molheira",
+            "molinete",
+            "monóculo",
+            "mouse pad",
+            "narguilé",
+            "notebook",
+            "ombreira",
+            "palmilha",
+            "pandeiro",
+            "parafina",
+            "parafuso",
+            "patinete",
+            "pé de pato",
+            "pen drive",
+            "persiana",
+            "picareta",
+            "piercing",
+            "pingente",
+            "poltrona",
+            "ponteiro",
+            "pregador",
+            "presilha",
+            "projétil",
+            "pulseira",
+            "ratoeira",
+            "revólver",
+            "roteador",
+            "sabonete",
+            "sandália",
+            "saxofone",
+            "secadora",
+            "semáforo",
+            "sombrero",
+            "tamborim",
+            "tarracha",
+            "telefone",
+            "torneira",
+            "tridente",
+            "trombone",
+            "trompete",
+            "turbante",
+            "uniforme",
+            "vassoura",
+            "xilofone",
+            "adaptador",
+            "aerofólio",
+            "agulheiro",
+            "amaciante",
+            "ampulheta",
+            "aquecedor",
+            "armadilha",
+            "assadeira",
+            "bafômetro",
+            "bagageiro",
+            "balaclava",
+            "balaústre",
+            "batedeira",
+            "betoneira",
+            "bomba de ar",
+            "bracelete",
+            "brinquedo",
+            "cabideiro",
+            "caderneta",
+            "cafeteira",
+            "caldeirão",
+            "candeeiro",
+            "caneleira",
+            "carrilhão",
+            "cassetete",
+            "catapulta",
+            "catavento",
+            "clarinete",
+            "comedouro",
+            "corretivo",
+            "crucifixo",
+            "espanador",
+            "ferradura",
+            "ferrorama",
+            "figurinha",
+            "filmadora",
+            "fio dental",
+            "furadeira",
+            "geladeira",
+            "giz de cera",
+            "gramofone",
+            "guirlanda",
+            "interfone",
+            "joelheira",
+            "lamparina",
+            "lancheira",
+            "lapiseira",
+            "luminária",
+            "mamadeira",
+            "mangueira",
+            "marionete",
+            "meia calça",
+            "microfone",
+            "minissaia",
+            "paliteiro",
+            "parabrisa",
+            "pé de cabra",
+            "podadeira",
+            "poncheira",
+            "queijeira",
+            "ralo de pia",
+            "reco-reco",
+            "relicário",
+            "repelente",
+            "sabão em pó",
+            "saladeira",
+            "salto alto",
+            "sapateira",
+            "sapatilha",
+            "sombrinha",
+            "tabuleiro",
+            "televisão",
+            "trampolim",
+            "triângulo",
+            "vídeo game",
+            "abotoadura",
+            "açucareiro",
+            "basculante",
+            "bola de gude",
+            "borrifador",
+            "bronzeador",
+            "bumerangue",
+            "caixa de som",
+            "calçadeira",
+            "calibrador",
+            "candelabro",
+            "cantoneira",
+            "carretilha",
+            "cavaquinho",
+            "cinta-liga",
+            "colchonete",
+            "computador",
+            "cubo mágico",
+            "delineador",
+            "detergente",
+            "espadrilha",
+            "espartilho",
+            "espingarda",
+            "estandarte",
+            "estilingue",
+            "farinheiro",
+            "ferramenta",
+            "focinheira",
+            "frasqueira",
+            "frigideira",
+            "galheteiro",
+            "gel fixador",
+            "grampeador",
+            "guarda-sol",
+            "guardanapo",
+            "guilhotina",
+            "hidratante",
+            "impressora",
+            "jardineira",
+            "lantejoula",
+            "lápis de cor",
+            "lixa de unha",
+            "luva de boxe",
+            "mata-mosca",
+            "mimeógrafo",
+            "novelo de lã",
+            "olho mágico",
+            "pano de chão",
+            "para-raios",
+            "paraquedas",
+            "pergaminho",
+            "periscópio",
+            "perna de pau",
+            "pipoqueira",
+            "pó compacto",
+            "prateleira",
+            "refratário",
+            "retrovisor",
+            "revisteiro",
+            "serpentina",
+            "soco inglês",
+            "sorveteira",
+            "telescópio",
+            "termômetro",
+            "torradeira",
+            "triturador",
+            "ventilador",
+            "violoncelo",
+            "zarabatana",
+            "alto falante",
+            "amortecedor",
+            "arco e flecha",
+            "castanholas",
+            "cavalo de pau",
+            "chave de boca",
+            "chave de roda",
+            "colher de pau",
+            "contrabaixo",
+            "cotoveleira",
+            "desodorante",
+            "despertador",
+            "escapamento",
+            "escavadeira",
+            "escumadeira",
+            "esparadrapo",
+            "fita adesiva",
+            "fita cassete",
+            "fogão a lenha",
+            "forma de gelo",
+            "gargantilha",
+            "lápis de olho",
+            "lápis labial",
+            "micro-ondas",
+            "microscópio",
+            "mosquiteiro",
+            "munhequeira",
+            "nebulizador",
+            "óculos de sol",
+            "pano de prato",
+            "penteadeira",
+            "pisca-pisca",
+            "rádio amador",
+            "rasteirinha",
+            "rede de pesca",
+            "rolo de massa",
+            "saboneteira",
+            "saca-rolhas",
+            "samba canção",
+            "suspensório",
+            "travesseiro",
+            "unha postiça",
+            "bolsa de palha",
+            "bolsa térmica",
+            "botijão de gás",
+            "brilho labial",
+            "cama elástica",
+            "camisa regata",
+            "chave de fenda",
+            "chave inglesa",
+            "coqueteleira",
+            "criado-mudo",
+            "desentupidor",
+            "desinfetante",
+            "escorregador",
+            "estetoscópio",
+            "farol de milha",
+            "filtro de água",
+            "fita isolante",
+            "guarda-chuva",
+            "guarda-roupa",
+            "meia arrastão",
+            "mesa de sinuca",
+            "metralhadora",
+            "papel carbono",
+            "pulverizador",
+            "quebra-nozes",
+            "relógio de sol",
+            "sanduicheira",
+            "toalha de mesa",
+            "tornozeleira",
+            "transferidor",
+            "tubo de ensaio",
+            "vídeo cassete",
+            "água sanitária",
+            "alicate de unha",
+            "árvore de natal",
+            "aspirador de pó",
+            "bola de boliche",
+            "camisa de força",
+            "carrinho de mão",
+            "cerca elétrica",
+            "churrasqueira",
+            "condicionador",
+            "desfibrilador",
+            "estabilizador",
+            "língua de sogra",
+            "palito de dente",
+            "panela de barro",
+            "papel laminado",
+            "quebra-cabeça",
+            "rádio gravador",
+            "retroprojetor",
+            "tinta de cabelo",
+            "vaso sanitário",
+            "abridor de latas",
+            "afiador de facas",
+            "bicho de pelúcia",
+            "cadeira de praia",
+            "cadeira de rodas",
+            "caixa de correio",
+            "caixa de fósforo",
+            "caneta hidrocor",
+            "carrinho de bebê",
+            "colete cervical",
+            "controle remoto",
+            "cortador de unha",
+            "garrafa térmica",
+            "grampo de cabelo",
+            "lente de contato",
+            "liquidificador",
+            "papel higiênico",
+            "porta-retrato",
+            "rede de descanso",
+            "relógio de pulso",
+            "saco de plástico",
+            "serra elétrica",
+            "cadeira elétrica",
+            "carrinho de feira",
+            "cartão de crédito",
+            "cartão de memória",
+            "cartucho de tinta",
+            "cortador de grama",
+            "marcador de texto",
+            "mesa de ping-pong",
+            "palito de fósforo",
+            "panela de pressão",
+            "secador de cabelo",
+            "abridor de garrafa",
+            "antena parabólica",
+            "apontador de lápis",
+            "cadeira de balanço",
+            "carrinho de rolimã",
+            "chapinha de cabelo",
+            "cinto de segurança",
+            "curvador de cílios",
+            "detector de metais",
+            "esfigmomanômetro",
+            "espremedor de alho",
+            "máquina de costura",
+            "marcador de página",
+            "multiprocessador",
+            "ventilador de teto",
+            "caixa registradora",
+            "depilador elétrico",
+            "máscara de mergulho",
+            "máscara de oxigênio",
+            "perfurador de papel",
+            "prendedor de cabelo",
+            "protetor auricular",
+            "escorredor de pratos",
+            "espremedor de frutas",
+            "esteira ergométrica",
+            "extintor de incêndio",
+            "ferro de passar roupa",
+            "máquina fotográfica",
+            "aparelho ortodôntico",
+            "carregador de celular",
+            "chapéu de aniversário",
+            "máquina de lavar louça",
+            "máquina de lavar roupa",
+            "escorredor de macarrão",
+            "carteira de habilitação",
+            "máquina de datilografar",
+        ];
+
+        const progress = document.getElementById("progress");
+        const container = document.getElementById("container");
+        const message = document.getElementById("message");
+        const inputContainer = document.getElementById("inputContainer");
+        const inputValue = document.getElementById("inputValue");
+        const inputConfirm = document.getElementById("inputConfirm");
+
+        function getRandomInt(max) {
+            return Math.floor(Math.random() * max);
+        }
+        function getNewRandomWord() {
+            return palavras.splice(getRandomInt(palavras.length), 1)[0];
+        }
+
+        function generateImpostors(numPlayers, numImpostors) {
+            const roles = new Array(numPlayers).fill(false);
+
+            for (let i = 0; i < numImpostors; i++) {
+                roles[i] = true;
+            }
+
+            for (let i = numPlayers - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [roles[i], roles[j]] = [roles[j], roles[i]];
+            }
+
+            return roles;
+        }
+        function waitForTimeout(milliseconds) {
+            return new Promise((resolve) => {
+                var c = 0;
+                const steps = 100;
+                progress.style.width = "0%";
+                const p = setInterval(() => {
+                    c += 1;
+                    progress.style.width = `${Math.ceil(c * 100 / steps)}%`;
+                }, milliseconds / steps);
+                setTimeout(() => {
+                    progress.style.width = "0%";
+                    clearInterval(p);
+                    resolve('Timeout reached');
+                }, milliseconds);
+            });
+        }
+        function waitForUserInteraction() {
+            return new Promise((resolve) => {
+                const resolvePromise = () => {
+                    document.removeEventListener('keydown', onKeydown);
+                    container.removeEventListener('keydown', onKeydown);
+                    document.removeEventListener('click', onClick);
+                    document.removeEventListener('touchend', onTouch);
+                    resolve('User interacted');
+                };
+
+                const onKeydown = (event) => {
+                    if (event.code === 'Space') {
+                        resolvePromise();
+                    }
+                };
+
+                const onClick = (e) => {
+                    resolvePromise();
+                    e.preventDefault();
+                };
+
+                const onTouch = (e) => {
+                    resolvePromise();
+                    e.preventDefault();
+                };
+
+                const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+                if (isTouchDevice) {
+                    document.addEventListener('touchend', onTouch);
+                } else {
+                    document.addEventListener('keydown', onKeydown);
+                    document.addEventListener('click', onClick);
+                    container.addEventListener('click', onClick);
+                }
+            });
+        }
+        function waitForConfirm() {
+            return new Promise((resolve) => {
+                const resolvePromise = () => {
+                    resolve('User interacted');
+                    inputConfirm.removeEventListener('click', onClick);
+                };
+
+                const onClick = () => {
+                    resolvePromise();
+                };
+
+                inputConfirm.addEventListener('click', onClick);
+            });
+        }
+        function capitalizeFirstLetter(string) {
+            return string.charAt(0).toUpperCase() + string.slice(1);
+        }
+
+        function showText(color, text) {
+            container.style.backgroundColor = color;
+            message.innerHTML = text;
+        }
+
+        async function visualNumericPrompt(color, message, min, max, suggestion) {
+            showText(color, message);
+            inputValue.setAttribute("min", min);
+            inputValue.setAttribute("max", max);
+            inputValue.value = suggestion || min;
+            inputContainer.style.display = "flex";
+            await waitForConfirm();
+            inputContainer.style.display = "none";
+            return inputValue.value
+        }
+        async function setup(params) {
+            var p = await visualNumericPrompt("#e6f4ff", "Quantos jogam?", 1, 12, 6);
+            var players = parseInt(p);
+            if (isNaN(players)) return [`Número invalido: "${p}"`, null, null];
+            if (players < 2) return [`Mínimo de 2 jogadores!`, null, null];
+
+            var i = await visualNumericPrompt("#ffe6f2", "Quantos impostores?", 1, players - 1);
+            var impostors = parseInt(i);
+            if (isNaN(impostors)) return [`Número invalido: "${i}"`, null, null];
+            if (impostors < 1) return [`Mínimo de 1 impostor!`, null, null];
+            if (impostors > players - 1) return [`Máximo de ${players - 1} impostores!`, null, null];
+
+            container.focus();
+            showText("#7bba85", `Jogadores ${players}<br>Impostores ${impostors}`);
+            await waitForTimeout(2000);
+            return [null, players, impostors];
+        }
+        async function jogo(n, m) {
+            showText("#ffffff", "Clique para começar");
+            await waitForUserInteraction();
+
+            showText("#7bba85", "...");
+            await waitForTimeout(2000);
+
+            var palavra = getNewRandomWord();
+            var impostores = generateImpostors(n, m);
+
+            for (let idx = 0; idx < n; idx++) {
+                showText("#ffffff", "Clique para revelar");
+                await waitForUserInteraction();
+                if (impostores[idx]) {
+                    showText("#ffe6f2", "Impostor");
+                    await waitForTimeout(3000);
+                }
+                else {
+                    showText("#e6f4ff", capitalizeFirstLetter(palavra));
+                    await waitForTimeout(3000 + 2000 * palavra.length / 10);
+                }
+                if (idx != n - 1) {
+                    showText("#ffffff", "Próxima pessoa");
+                    await waitForTimeout(2000);
+                }
+            }
+            showText("#fff8e6", "Bom jogo!");
+            await waitForTimeout(2000);
+        }
+
+        (async () => {
+            while (true) {
+                showText("#ffffff", "Desenho impostor!<br><p class='small'>Clique para configurar</p>");
+                await waitForUserInteraction();
+                const [error, players, impostors] = await setup();
+                await container.requestFullscreen();
+                if (error) {
+                    showText("#ffe6f2", error);
+                    await waitForTimeout(2000);
+                    continue;
+                }
+                while (true) {
+                    await jogo(players, impostors);
+                }
+            }
+        })()
+
+    </script>
+</body>
+
+</html>
