@@ -1137,12 +1137,12 @@
                 showText("#ffffff", "Desenho impostor!<br><p class='small'>Clique para configurar</p>");
                 await waitForUserInteraction();
                 const [error, players, impostors] = await setup();
-                await container.requestFullscreen();
                 if (error) {
                     showText("#ffe6f2", error);
                     await waitForTimeout(2000);
                     continue;
                 }
+                await container.requestFullscreen();
                 while (true) {
                     await jogo(players, impostors);
                 }
