@@ -5,13 +5,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, user-scalable=no">
     <title>Tango - @lucaslugao</title>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playwrite+DE+Grund:wght@100..400&display=swap"
+        rel="stylesheet">
     <style>
         body {
-            font-family: sans-serif;
+            font-family: "Playwrite DE Grund", cursive;
+            font-optical-sizing: auto;
+            font-style: normal;
             text-align: center;
             height: 100vh;
             margin: 0;
             -webkit-tap-highlight-color: transparent;
+            transition: background-color 0.3s ease;
         }
 
         .game {
@@ -26,19 +34,52 @@
                 margin-bottom: 20px;
             }
         }
+
+        body[data-state="solved"] {
+            background-color: rgb(216, 245, 255);
+        }
+
+        .title {
+            font-size: 2em;
+            margin: 0;
+            color: #000;
+        }
+
+        .myname {
+            font-size: 0.8em;
+            margin-top: 0;
+            color: #000;
+        }
+
+        .notice {
+            opacity: 0;
+            margin: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        body[data-state="solved"] .notice {
+            opacity: 1;
+        }
     </style>
 </head>
 
 <body>
     <div class="game">
+        <p class="title">Tango Player</p>
+        <p class="myname">by @lucaslugao</p>
+        <p class="notice">Solved!</p>
         <div class="controls">
             <button class="undo">Undo</button>
             <button class="clear">Clear</button>
             <button class="redo">Redo</button>
+            <button class="confetti">Confetti On</button>
         </div>
     </div>
 
     <script>
+        // This code is licensed under CC-BY-NC 4.0
+        // https://creativecommons.org/licenses/by-nc/4.0/
+
         class BitBuffer {
             constructor(base64String) {
                 this.data = Array.from(this.base64ToUint8Array(base64String));
@@ -135,6 +176,10 @@
                 const bit = 1 << k;
                 this.mask &= ~bit;
             }
+
+            allSet() {
+                return this.mask === 0b111111;
+            }
         }
         class Tango {
             constructor(container, cellSize = 60) {
@@ -180,11 +225,29 @@
                 this.container.querySelector(".clear").addEventListener("click", () => {
                     this.clear();
                 });
+
+                const confetti = localStorage.getItem("confetti");
+                const confettiButton = this.container.querySelector(".confetti");
+                this.confetti = true;
+
+                if (confetti) {
+                    this.confetti = confetti === "true";
+                }
+                confettiButton.innerText = this.confetti ? "Confetti On" : "Confetti Off";
+                confettiButton.addEventListener("click", () => {
+                    this.confetti = !this.confetti;
+                    localStorage.setItem("confetti", this.confetti);
+                    confettiButton.innerText = this.confetti ? "Confetti On" : "Confetti Off";
+                });
+
+                this.hint();
             }
+
 
             clear() {
                 this.loadState(this.puzzle);
                 this.push();
+                this.hint();
             }
 
             set(x, y, c) {
@@ -229,11 +292,12 @@
                         this.updateCell(x, y);
                     }
                 }
+                this.hint();
             }
+
             setCurrent(state) {
                 this.current = state;
                 window.location.hash = encodeURIComponent(this.current);
-
             }
 
             currentState() {
@@ -259,10 +323,26 @@
                 }
             }
 
+            hint() {
+                if (this.isSolved()) {
+                    document.body.dataset.state = "solved";
+                    if (this.confetti) {
+                        confetti({
+                            particleCount: 100,
+                            spread: 70,
+                            origin: { y: 1 }
+                        });
+                    }
+                } else {
+                    document.body.dataset.state = "playing";
+                }
+            }
+
             push() {
                 this.future = [];
                 this.history.push(this.current);
                 this.setCurrent(this.currentState());
+                this.loadState(this.current);
             }
 
             handleClick(x, y, right) {
@@ -290,10 +370,6 @@
                     this.setCurrent(this.history.pop());
                     this.loadState(this.current);
                 }
-                console.log({
-                    future: this.future,
-                    history: this.history
-                });
             }
 
             redo() {
@@ -302,10 +378,6 @@
                     this.setCurrent(this.future.pop());
                     this.loadState(this.current);
                 }
-                console.log({
-                    future: this.future,
-                    history: this.history
-                });
             }
 
             createSymbol(x, y, scale, symbol, rotated) {
@@ -412,8 +484,56 @@
                     }
                 }
             }
-        }
 
+            checkConstraint(line, constr) {
+                if (constr.mask === 0) {
+                    return true;
+                }
+                const validA = line & 0b011111;
+                const validS = line >> 1;
+                return (((validA ^ validS ^ constr.value) & constr.mask) === 0);
+            }
+
+            countCompletions(line, constr) {
+                let count = 0;
+                for (const valid of [11, 13, 19, 21, 22, 25, 26, 37, 38, 41, 42, 44, 50, 52]) {
+                    if (((line.value ^ valid) & line.mask) !== 0) {
+                        continue;
+                    }
+                    if (!this.checkConstraint(valid, constr)) {
+                        continue;
+                    }
+                    count++;
+                }
+                return count;
+            }
+
+            checkValidity() {
+                for (let i = 0; i < 6; i++) {
+                    if (this.countCompletions(this.rows[i], this.rowsConstr[i]) === 0) {
+                        return ["row", i];
+                    }
+                    if (this.countCompletions(this.cols[i], this.colsConstr[i]) === 0) {
+                        return ["col", i];
+                    }
+                }
+                return [null, null];
+            }
+
+            isValid() {
+                const [type, index] = this.checkValidity();
+                return type === null
+            }
+
+            isSolved() {
+                for (let y = 0; y < 6; y++) {
+                    if (!this.rows[y].allSet()) {
+                        return false;
+                    }
+                }
+                return this.isValid();
+            }
+        }
         new Tango(document.querySelector(".game"));
     </script>
 </body>
