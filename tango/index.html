@@ -1,25 +1,25 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
-    <!-- Google Tag Manager -->
-    <script>(function (w, d, s, l, i) {
-            w[l] = w[l] || []; w[l].push({
-                'gtm.start':
-                    new Date().getTime(), event: 'gtm.js'
-            }); var f = d.getElementsByTagName(s)[0],
-                j = d.createElement(s), dl = l != 'dataLayer' ? '&l=' + l : ''; j.async = true; j.src =
-                    'https://www.googletagmanager.com/gtm.js?id=' + i + dl; f.parentNode.insertBefore(j, f);
-        })(window, document, 'script', 'dataLayer', 'GTM-M53773JQ');</script>
-    <!-- End Google Tag Manager -->
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-PFSSR8YZ03"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+        gtag('config', 'G-PFSSR8YZ03');
+    </script>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, user-scalable=no">
+    <meta name="viewport" content="width=device-width">
+    <meta name="description"
+        content="Web page to play Tango, a 6x6 single player board game. Puzzles are passed as URL parameters.">
     <title>Tango Player - @lucaslugao</title>
     <script rel="preconnect" src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"
         async></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Playwrite+DE+Grund:wght@100..400&display=swap"
+    <link defer href="https://fonts.googleapis.com/css2?family=Playwrite+DE+Grund:wght@100..400&display=swap"
         rel="stylesheet">
     <link rel="icon"
         href="data:image/svg+xml,%3C%3Fxml version='1.0' encoding='UTF-8' standalone='no'%3F%3E%3Csvg width='16px' height='16px' viewBox='-0.05 -0.05 1.1 1.1' version='1.1' id='svg1' xmlns='http://www.w3.org/2000/svg' xmlns:svg='http://www.w3.org/2000/svg'%3E%3Ccircle fill='%23ffb31e' stroke='black' stroke-width='0.05' cx='0.5' cy='0.5' r='0.5' id='circle1' /%3E%3Cpath fill='%2382afed' stroke='black' stroke-width='0.05' d='m 0.7056 0.0444 a 0.5 0.5 90 0 1 0.0444 0.2056 a 0.5 0.5 90 0 1 -0.5 0.5 a 0.5 0.5 90 0 1 -0.2056 -0.0444 a 0.5 0.5 90 0 0 0.4556 0.2944 a 0.5 0.5 90 0 0 0.5 -0.5 a 0.5 0.5 90 0 0 -0.2944 -0.4556 z' id='path1' /%3E%3C/svg%3E%0A">
@@ -28,10 +28,6 @@
 </head>
 
 <body>
-    <!-- Google Tag Manager (noscript) -->
-    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-M53773JQ" height="0" width="0"
-            style="display:none;visibility:hidden"></iframe></noscript>
-    <!-- End Google Tag Manager (noscript) -->
     <div class="game">
         <div class="other">
             <p class="title">Tango Player</p>
@@ -43,6 +39,27 @@
                 <button class="button redo">Redo</button>
                 <button class="button confetti outline">Confetti On</button>
             </div>
+            <svg version="1.1">
+                <defs>
+                    <symbol id="sun" viewBox="-1 -1 3 3">
+                        <circle fill="#ffb31e" stroke="black" stroke-width="0.05" cx="0.5" cy="0.5" r="0.5"></circle>
+                    </symbol>
+                    <symbol id="moon" viewBox="-1 -1 3 3">
+                        <path fill="#82afed" stroke="black" stroke-width="0.05"
+                            d="m 0.7056 0.0444 a 0.5 0.5 90 0 1 0.0444 0.2056 a 0.5 0.5 90 0 1 -0.5 0.5 a 0.5 0.5 90 0 1 -0.2056 -0.0444 a 0.5 0.5 90 0 0 0.4556 0.2944 a 0.5 0.5 90 0 0 0.5 -0.5 a 0.5 0.5 90 0 0 -0.2944 -0.4556 z">
+                        </path>
+                    </symbol>
+                    <symbol id="equal" viewBox="-1 -1 3 3">
+                        <path fill="black" stroke="#fff" stroke-width="0.1" stroke-linecap="round" paint-order="stroke"
+                            d="m 0.2 0.3 l 0.6 0 l 0 0.1 l -0.6 0 z m 0 0.3 l 0.6 0 l 0 0.1 l -0.6 0 z"></path>
+                    </symbol>
+                    <symbol id="cross" viewBox="-1 -1 3 3">
+                        <path fill="black" stroke="#fff" stroke-width="0.1" stroke-linecap="round" paint-order="stroke"
+                            d="m 0.3232 0.2525 l 0.4243 0.4243 l -0.0707 0.0707 l -0.4243 -0.4243 z m -0.0707 0.4243 l 0.4243 -0.4243 l 0.0707 0.0707 l -0.4243 0.4243 z">
+                        </path>
+                    </symbol>
+                </defs>
+            </svg>
         </div>
     </div>
     <script src="main.js"></script>

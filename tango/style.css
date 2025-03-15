@@ -73,3 +73,7 @@ body[data-state="solved"] .notice {
 [data-base="1"]>rect {
     fill: #ddd;
 }
+
+svg {
+    touch-action: manipulation;
+}

@@ -19,13 +19,14 @@ class BitBuffer {
     readBits(numBits) {
         let result = 0;
         let readBits = 0;
+        let remainingBits = numBits;
 
-        while (numBits > 0) {
+        while (remainingBits > 0) {
             const byteIndex = Math.floor(this.bitIndex / 8);
             const bitOffset = this.bitIndex % 8;
 
             const availableBits = 8 - bitOffset;
-            const readAmount = Math.min(numBits, availableBits);
+            const readAmount = Math.min(remainingBits, availableBits);
 
             if (byteIndex >= this.data.length) {
                 return 0;
@@ -36,7 +37,7 @@ class BitBuffer {
 
             result |= readVal << readBits;
             readBits += readAmount;
-            numBits -= readAmount;
+            remainingBits -= readAmount;
             this.bitIndex += readAmount;
         }
 
@@ -44,9 +45,10 @@ class BitBuffer {
     }
 
     writeBits(value, numBits) {
-        value &= (1 << numBits) - 1;
+        let remainingBits = numBits;
+        let remainingValue = value & ((1 << remainingBits) - 1);
 
-        while (numBits > 0) {
+        while (remainingBits > 0) {
             const byteIndex = Math.floor(this.bitIndex / 8);
             const bitOffset = this.bitIndex % 8;
 
@@ -55,15 +57,15 @@ class BitBuffer {
             }
 
             const availableBits = 8 - bitOffset;
-            const writeBits = Math.min(numBits, availableBits);
+            const writeBits = Math.min(remainingBits, availableBits);
 
             const mask = ((1 << writeBits) - 1) << bitOffset;
-            const writeVal = (value << bitOffset);
+            const writeVal = (remainingValue << bitOffset);
 
             this.data[byteIndex] = (this.data[byteIndex] & ~mask) | (writeVal & mask);
 
-            value >>= writeBits;
-            numBits -= writeBits;
+            remainingValue >>= writeBits;
+            remainingBits -= writeBits;
             this.bitIndex += writeBits;
         }
     }
@@ -104,7 +106,9 @@ class MaskedBitset {
 }
 class Tango {
     constructor(container, undoButton, clearButton, redoButton, confettiButton, cellSize = 60) {
+        this.container = container;
         this.undoButton = undoButton;
+        this.clearButton = clearButton;
         this.redoButton = redoButton;
         this.confettiButton = confettiButton;
         this.cellSize = cellSize;
@@ -115,12 +119,17 @@ class Tango {
         this.rowsConstr = Array(6).fill(null).map(() => new MaskedBitset());
         this.colsConstr = Array(6).fill(null).map(() => new MaskedBitset());
 
+        this.init();
+    }
+
+    init() {
+
         const urlParams = new URLSearchParams(window.location.search);
         this.puzzle = urlParams.get('puzzle');
 
         if (!this.puzzle) {
-            window.location.search = `?puzzle=CIMgAEAQACAIAAAAAAAQAgAhIQAAAKAQ`;
-            return;
+            this.puzzle = "CIMgAEAQACAIAAAAAAAQAgAhIQAAAKAQ";
+            window.history.pushState({}, "", `/?puzzle=${this.puzzle}`);
         }
         const buf = new BitBuffer(this.puzzle);
         for (let k = 0; k < 6; k++) {
@@ -134,7 +143,6 @@ class Tango {
         }
         this.cells = this.createBoard();
         this.setState(decodeURIComponent(window.location.hash.substring(1)) || this.puzzle);
-        container.appendChild(this.svgElement);
 
         this.undoButton.addEventListener("click", () => {
             this.undo();
@@ -144,7 +152,7 @@ class Tango {
             this.redo();
         });
         this.redoButton.disabled = true;
-        clearButton.addEventListener("click", () => {
+        this.clearButton.addEventListener("click", () => {
             this.clear();
         });
 
@@ -169,7 +177,6 @@ class Tango {
             }
         });
     }
-
     updateConfettiButton() {
         localStorage.setItem("confetti", this.confetti);
         this.confettiButton.innerText = this.confetti ? "Confetti On" : "Confetti Off";
@@ -261,7 +268,7 @@ class Tango {
     }
 
     handleClick(x, y, right) {
-        if (this.cells[y][x].dataset.base == "1") return;
+        if (this.cells[y][x].dataset.base === "1") return;
         this.history.push(this.getState());
         this.future = [];
         this.redoButton.disabled = true;
@@ -269,7 +276,7 @@ class Tango {
         const [value, ok] = this.get(x, y);
         const next = right ? (ok ? value + 2 : 1) % 3 : (ok ? value : 2) % 3;
 
-        if (next == 0) {
+        if (next === 0) {
             this.delete(x, y);
         } else {
             this.set(x, y, next - 1);
@@ -316,7 +323,7 @@ class Tango {
         use.setAttribute('height', size);
         use.setAttribute('href', `#${symbol}`);
         use.classList.add(`symbol-${symbol}`);
-        use.classList.add(`symbol`);
+        use.classList.add("symbol");
         use.setAttribute('pointer-events', 'none');
         if (rotated) {
             use.setAttribute('transform', `rotate(90 ${xCoord + size / 2} ${yCoord + size / 2})`);
@@ -330,30 +337,10 @@ class Tango {
         const widthSize = this.cellSize * 6;
         const heightSize = this.cellSize * 6;
 
-        this.svgElement = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        this.svgElement = this.container.querySelector("svg");
         this.svgElement.setAttribute('width', widthSize + 2);
         this.svgElement.setAttribute('height', heightSize + 2);
         this.svgElement.setAttribute('viewBox', `-1 -1 ${widthSize + 2} ${heightSize + 2}`);
-        this.svgElement.setAttribute('version', '1.1');
-
-        const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-        this.svgElement.appendChild(defs);
-
-        const symbols = {
-            sun: `<circle fill="#ffb31e" stroke="black" stroke-width="0.05" cx="0.5" cy="0.5" r="0.5"/>`,
-            moon: `<path fill="#82afed" stroke="black" stroke-width="0.05" d="m 0.7056 0.0444 a 0.5 0.5 90 0 1 0.0444 0.2056 a 0.5 0.5 90 0 1 -0.5 0.5 a 0.5 0.5 90 0 1 -0.2056 -0.0444 a 0.5 0.5 90 0 0 0.4556 0.2944 a 0.5 0.5 90 0 0 0.5 -0.5 a 0.5 0.5 90 0 0 -0.2944 -0.4556 z"/>`,
-            equal: `<path fill="black" stroke="#fff" stroke-width="0.1" stroke-linecap="round" paint-order="stroke" d="m 0.2 0.3 l 0.6 0 l 0 0.1 l -0.6 0 z m 0 0.3 l 0.6 0 l 0 0.1 l -0.6 0 z"/>`,
-            cross: `<path fill="black" stroke="#fff" stroke-width="0.1" stroke-linecap="round" paint-order="stroke" d="m 0.3232 0.2525 l 0.4243 0.4243 l -0.0707 0.0707 l -0.4243 -0.4243 z m -0.0707 0.4243 l 0.4243 -0.4243 l 0.0707 0.0707 l -0.4243 0.4243 z"/>`,
-        };
-
-        for (const [id, path] of Object.entries(symbols)) {
-            const symbol = document.createElementNS('http://www.w3.org/2000/svg', 'symbol');
-            symbol.setAttribute('id', id);
-            symbol.setAttribute('viewBox', '-1 -1 3 3');
-            symbol.innerHTML = path;
-            defs.appendChild(symbol);
-        }
-
 
         for (let y = 0; y < 6; y++) {
             for (let x = 0; x < 6; x++) {
