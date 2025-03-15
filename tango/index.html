@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, user-scalable=no">
     <title>Tango - @lucaslugao</title>
+    <link rel="stylesheet" href="https://unpkg.com/chota@latest">
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -28,11 +29,19 @@
             justify-content: center;
             align-items: center;
             flex-direction: column;
-            height: 100%;
+            height: 100dvh;
+        }
 
-            .controls {
-                margin-bottom: 20px;
-            }
+        .controls {
+            margin: 10px 0px;
+            display: flex;
+            justify-content: space-around;
+            min-width: 362px;
+        }
+
+        .controls button {
+            font-size: 1em;
+            padding: 8px 10px;
         }
 
         body[data-state="solved"] {
@@ -60,19 +69,38 @@
         body[data-state="solved"] .notice {
             opacity: 1;
         }
+
+        .symbol-moon,
+        .symbol-sun {
+            visibility: hidden;
+        }
+
+        [data-ok="1"][data-value="0"]>.symbol-moon {
+            visibility: visible;
+        }
+
+        [data-ok="1"][data-value="1"]>.symbol-sun {
+            visibility: visible;
+        }
+
+        [data-base="1"]>rect {
+            fill: #ddd;
+        }
     </style>
 </head>
 
 <body>
     <div class="game">
-        <p class="title">Tango Player</p>
-        <p class="myname">by @lucaslugao</p>
-        <p class="notice">Solved!</p>
-        <div class="controls">
-            <button class="undo">Undo</button>
-            <button class="clear">Clear</button>
-            <button class="redo">Redo</button>
-            <button class="confetti">Confetti On</button>
+        <div class="other">
+            <p class="title">Tango Player</p>
+            <p class="myname">by @lucaslugao</p>
+            <p class="notice">Solved!</p>
+            <div class="controls">
+                <button class="button undo">Undo</button>
+                <button class="button clear-board">Clear</button>
+                <button class="button redo">Redo</button>
+                <button class="button confetti outline">Confetti On</button>
+            </div>
         </div>
     </div>
 
@@ -182,22 +210,25 @@
             }
         }
         class Tango {
-            constructor(container, cellSize = 60) {
+            constructor(container, undoButton, clearButton, redoButton, confettiButton, cellSize = 60) {
+                this.undoButton = undoButton;
+                this.redoButton = redoButton;
+                this.confettiButton = confettiButton;
                 this.cellSize = cellSize;
-                this.container = container;
-
-                const urlParams = new URLSearchParams(window.location.search);
-                this.puzzle = urlParams.get('puzzle');
-                if (!this.puzzle) {
-                    window.location.search = `?puzzle=CIMgAEAQACAIAAAAAAAQAgAhIQAAAKAQ`;
-                    return;
-                }
-
+                this.history = [];
+                this.future = [];
                 this.rows = Array(6).fill(null).map(() => new MaskedBitset());
                 this.cols = Array(6).fill(null).map(() => new MaskedBitset());
                 this.rowsConstr = Array(6).fill(null).map(() => new MaskedBitset());
                 this.colsConstr = Array(6).fill(null).map(() => new MaskedBitset());
 
+                const urlParams = new URLSearchParams(window.location.search);
+                this.puzzle = urlParams.get('puzzle');
+
+                if (!this.puzzle) {
+                    window.location.search = `?puzzle=CIMgAEAQACAIAAAAAAAQAgAhIQAAAKAQ`;
+                    return;
+                }
                 const buf = new BitBuffer(this.puzzle);
                 for (let k = 0; k < 6; k++) {
                     this.setRow(k, new MaskedBitset(buf.readBits(6), buf.readBits(6)));
@@ -208,64 +239,60 @@
                     this.colsConstr[k].value = buf.readBits(5);
                     this.colsConstr[k].mask = buf.readBits(5);
                 }
-                this.createBoard();
-                this.loadState(decodeURIComponent(window.location.hash.substring(1)));
-                this.setCurrent(this.currentState());
-                this.history = [];
-                this.future = [];
+                this.cells = this.createBoard();
+                this.setState(decodeURIComponent(window.location.hash.substring(1)) || this.puzzle);
+                container.appendChild(this.svgElement);
 
-                this.container.appendChild(this.svgElement);
-
-                this.container.querySelector(".undo").addEventListener("click", () => {
+                this.undoButton.addEventListener("click", () => {
                     this.undo();
                 });
-                this.container.querySelector(".redo").addEventListener("click", () => {
+                this.undoButton.disabled = true;
+                this.redoButton.addEventListener("click", () => {
                     this.redo();
                 });
-                this.container.querySelector(".clear").addEventListener("click", () => {
+                this.redoButton.disabled = true;
+                clearButton.addEventListener("click", () => {
                     this.clear();
                 });
 
                 const confetti = localStorage.getItem("confetti");
-                const confettiButton = this.container.querySelector(".confetti");
                 this.confetti = true;
 
                 if (confetti) {
                     this.confetti = confetti === "true";
                 }
-                confettiButton.innerText = this.confetti ? "Confetti On" : "Confetti Off";
-                confettiButton.addEventListener("click", () => {
+
+                this.updateConfettiButton();
+                this.confettiButton.addEventListener("click", () => {
                     this.confetti = !this.confetti;
-                    localStorage.setItem("confetti", this.confetti);
-                    confettiButton.innerText = this.confetti ? "Confetti On" : "Confetti Off";
+                    this.updateConfettiButton();
                 });
 
-                this.hint();
+                this.persistState();
+                setTimeout(() => {
+                    window.addEventListener("hashchange", () => {
+                        this.setState(decodeURIComponent(window.location.hash.substring(1)) || this.puzzle);
+                    });
+                }, 0)
             }
 
-
-            clear() {
-                this.loadState(this.puzzle);
-                this.push();
-                this.hint();
+            updateConfettiButton() {
+                localStorage.setItem("confetti", this.confetti);
+                this.confettiButton.innerText = this.confetti ? "Confetti On" : "Confetti Off";
+                if (this.confetti) {
+                    this.confettiButton.classList.remove("dark");
+                }
+                else {
+                    this.confettiButton.classList.add("dark");
+                }
             }
+
 
             set(x, y, c) {
                 this.cols[x].set(y, c);
                 this.rows[y].set(x, c);
-            }
 
-            get(x, y) {
-                return this.rows[y].get(x);
-            }
-
-            has(x, y) {
-                return this.rows[y].has(x);
-            }
-
-            delete(x, y) {
-                this.rows[y].delete(x);
-                this.cols[x].delete(y);
+                this.drawCell(x, y);
             }
 
             setRow(y, row) {
@@ -276,51 +303,52 @@
                     if (ok) {
                         this.cols[x].set(y, v);
                     }
+                    this.drawCell(x, y);
                 }
             }
 
-            loadState(current) {
-                if (!current) {
-                    return;
-                }
-                const currentBuf = new BitBuffer(current);
+
+            delete(x, y) {
+                this.rows[y].delete(x);
+                this.cols[x].delete(y);
+
+                this.drawCell(x, y);
+            }
+
+            get(x, y) {
+                return this.rows[y].get(x);
+            }
+
+            has(x, y) {
+                return this.rows[y].has(x);
+            }
+
+            setState(state) {
+                const stateBuf = new BitBuffer(state);
                 for (let k = 0; k < 6; k++) {
-                    this.setRow(k, new MaskedBitset(currentBuf.readBits(6), currentBuf.readBits(6)));
+                    this.setRow(k, new MaskedBitset(stateBuf.readBits(6), stateBuf.readBits(6)));
                 }
-                for (let y = 0; y < 6; y++) {
-                    for (let x = 0; x < 6; x++) {
-                        this.updateCell(x, y);
-                    }
-                }
-                this.hint();
             }
 
-            setCurrent(state) {
-                this.current = state;
-                window.location.hash = encodeURIComponent(this.current);
-            }
-
-            currentState() {
+            getState() {
                 const buf = new BitBuffer("");
                 for (let k = 0; k < 6; k++) {
-                    const row = this.rows[k];
-                    buf.writeBits(row.value, 6);
-                    buf.writeBits(row.mask, 6);
+                    buf.writeBits(this.rows[k].value, 6);
+                    buf.writeBits(this.rows[k].mask, 6);
                 }
                 return btoa(String.fromCharCode(...buf.data));
             }
 
-            updateCell(x, y) {
-                const cellGroup = this.svgElement.querySelector(`[data-x="${x}"][data-y="${y}"]`);
-                const existing = cellGroup.querySelector("use")
-                if (existing) {
-                    cellGroup.removeChild(existing);
-                }
+            persistState() {
+                this.hint();
+                window.history.replaceState(undefined, undefined, `#${encodeURIComponent(this.getState())}`);
+            }
+
+            drawCell(x, y) {
+                if (this.cells === undefined) return;
                 const [value, ok] = this.get(x, y);
-                if (ok) {
-                    const symbol = value !== 0 ? "sun" : "moon";
-                    cellGroup.appendChild(this.createSymbol(0, 0, 1.0, symbol, false));
-                }
+                this.cells[y][x].dataset.value = value;
+                this.cells[y][x].dataset.ok = ok;
             }
 
             hint() {
@@ -338,45 +366,47 @@
                 }
             }
 
-            push() {
-                this.future = [];
-                this.history.push(this.current);
-                this.setCurrent(this.currentState());
-                this.loadState(this.current);
-            }
-
             handleClick(x, y, right) {
-                let next = 0;
+                if (this.cells[y][x].dataset.base == "1") return;
+                this.history.push(this.getState());
+                this.future = [];
+                this.redoButton.disabled = true;
+                this.undoButton.disabled = false;
                 const [value, ok] = this.get(x, y);
-                const state = ok ? value + 1 : 0;
-                if (right) {
-                    next = (state + 1) % 3;
-                } else {
-                    next = (state - 1 + 3) % 3;
-                }
+                const next = right ? (ok ? value + 2 : 1) % 3 : (ok ? value : 2) % 3;
 
                 if (next == 0) {
                     this.delete(x, y);
                 } else {
                     this.set(x, y, next - 1);
                 }
-                this.updateCell(x, y);
-                this.push();
+                this.persistState();
             }
 
             undo() {
                 if (this.history.length > 0) {
-                    this.future.push(this.current);
-                    this.setCurrent(this.history.pop());
-                    this.loadState(this.current);
+                    this.future.push(this.getState());
+                    this.redoButton.disabled = false;
+                    this.setState(this.history.pop());
+                    this.persistState();
                 }
+            }
+
+            clear() {
+                this.history.push(this.getState());
+                this.future = [];
+                this.undoButton.disabled = false;
+                this.redoButton.disabled = true;
+                this.setState(this.puzzle);
+                this.persistState();
             }
 
             redo() {
                 if (this.future.length > 0) {
-                    this.history.push(this.current);
-                    this.setCurrent(this.future.pop());
-                    this.loadState(this.current);
+                    this.history.push(this.getState());
+                    this.undoButton.disabled = false;
+                    this.setState(this.future.pop());
+                    this.persistState();
                 }
             }
 
@@ -391,6 +421,8 @@
                 use.setAttribute('width', size);
                 use.setAttribute('height', size);
                 use.setAttribute('href', `#${symbol}`);
+                use.classList.add(`symbol-${symbol}`);
+                use.classList.add(`symbol`);
                 use.setAttribute('pointer-events', 'none');
                 if (rotated) {
                     use.setAttribute('transform', `rotate(90 ${xCoord + size / 2} ${yCoord + size / 2})`);
@@ -399,6 +431,8 @@
             };
 
             createBoard() {
+                let cells = Array.from({ length: 6 }, () => Array(6).fill(null));
+
                 const widthSize = this.cellSize * 6;
                 const heightSize = this.cellSize * 6;
 
@@ -446,24 +480,26 @@
                         rect.setAttribute('stroke', 'black');
                         cellGroup.appendChild(rect);
 
-
                         const [value, ok] = this.get(x, y);
-                        if (ok) {
-                            const symbol = value !== 0 ? "sun" : "moon";
-                            cellGroup.appendChild(this.createSymbol(0, 0, 1.0, symbol, false));
-                            rect.setAttribute('fill', "#ddd");
-                        } else {
-                            cellGroup.addEventListener("contextmenu", (e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                this.handleClick(x, y, true);
-                            });
-                            cellGroup.addEventListener("click", (e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                this.handleClick(x, y, false);
-                            });
-                        }
+                        cellGroup.dataset.value = value;
+                        cellGroup.dataset.ok = ok;
+                        cellGroup.dataset.base = ok;
+
+                        cellGroup.appendChild(this.createSymbol(0, 0, 1.0, "sun", false));
+                        cellGroup.appendChild(this.createSymbol(0, 0, 1.0, "moon", false));
+
+                        cellGroup.addEventListener("contextmenu", (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            this.handleClick(x, y, true);
+                        });
+                        cellGroup.addEventListener("click", (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            this.handleClick(x, y, false);
+                        });
+
+                        cells[y][x] = cellGroup;
 
                     }
                 }
@@ -472,17 +508,18 @@
                     for (let x = 0; x < 6; x++) {
                         const [rowValue, rowOk] = this.rowsConstr[y].get(x);
                         if (rowOk) {
-                            const symbol = rowValue !== 0 ? "cross" : "equal";
+                            const symbol = ["equal", "cross"][rowValue];
                             this.svgElement.appendChild(this.createSymbol(x + 0.5, y, 0.8, symbol, false));
                         }
 
                         const [colValue, colOk] = this.colsConstr[x].get(y);
                         if (colOk) {
-                            const symbol = colValue !== 0 ? "cross" : "equal";
+                            const symbol = ["equal", "cross"][colValue];
                             this.svgElement.appendChild(this.createSymbol(x, y + 0.5, 0.8, symbol, true));
                         }
                     }
                 }
+                return cells;
             }
 
             checkConstraint(line, constr) {
@@ -534,7 +571,22 @@
                 return this.isValid();
             }
         }
-        new Tango(document.querySelector(".game"));
+        new Tango(
+            document.querySelector(".game"),
+            document.querySelector(".undo"),
+            document.querySelector(".clear-board"),
+            document.querySelector(".redo"),
+            document.querySelector(".confetti"),
+        );
+    </script>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-PFSSR8YZ03"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+
+        gtag('config', 'G-PFSSR8YZ03');
     </script>
 </body>
 
