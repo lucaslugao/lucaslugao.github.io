@@ -280,11 +280,12 @@
                 });
 
                 this.persistState();
-                setTimeout(() => {
-                    window.addEventListener("hashchange", () => {
-                        this.setState(decodeURIComponent(window.location.hash.substring(1)) || this.puzzle);
-                    });
-                }, 0)
+                window.addEventListener("hashchange", () => {
+                    const newState = decodeURIComponent(window.location.hash.substring(1)) || this.puzzle;
+                    if (this.getState() !== newState) {
+                        this.setState(newState);
+                    }
+                });
             }
 
             updateConfettiButton() {
