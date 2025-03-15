@@ -131,6 +131,11 @@ class Tango {
             this.puzzle = "CIMgAEAQACAIAAAAAAAQAgAhIQAAAKAQ";
             window.history.pushState({}, "", `/?puzzle=${this.puzzle}`);
         }
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({
+            'event': 'puzzle',
+            'hash': this.puzzle
+        });
         const buf = new BitBuffer(this.puzzle);
         for (let k = 0; k < 6; k++) {
             this.setRow(k, new MaskedBitset(buf.readBits(6), buf.readBits(6)));
