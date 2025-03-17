@@ -17,10 +17,6 @@
     <title>Tango Player - @lucaslugao</title>
     <script rel="preconnect" src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"
         async></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link defer href="https://fonts.googleapis.com/css2?family=Playwrite+DE+Grund:wght@100..400&display=swap"
-        rel="stylesheet">
     <link rel="icon"
         href="data:image/svg+xml,%3C%3Fxml version='1.0' encoding='UTF-8' standalone='no'%3F%3E%3Csvg width='16px' height='16px' viewBox='-0.05 -0.05 1.1 1.1' version='1.1' id='svg1' xmlns='http://www.w3.org/2000/svg' xmlns:svg='http://www.w3.org/2000/svg'%3E%3Ccircle fill='%23ffb31e' stroke='black' stroke-width='0.05' cx='0.5' cy='0.5' r='0.5' id='circle1' /%3E%3Cpath fill='%2382afed' stroke='black' stroke-width='0.05' d='m 0.7056 0.0444 a 0.5 0.5 90 0 1 0.0444 0.2056 a 0.5 0.5 90 0 1 -0.5 0.5 a 0.5 0.5 90 0 1 -0.2056 -0.0444 a 0.5 0.5 90 0 0 0.4556 0.2944 a 0.5 0.5 90 0 0 0.5 -0.5 a 0.5 0.5 90 0 0 -0.2944 -0.4556 z' id='path1' /%3E%3C/svg%3E%0A">
 
@@ -39,7 +35,7 @@
                 <button class="button redo">Redo</button>
                 <button class="button confetti outline">Confetti On</button>
             </div>
-            <svg version="1.1">
+            <svg version="1.1" width="362" height="362" viewBox="-1 -1 362 362">
                 <defs>
                     <symbol id="sun" viewBox="-1 -1 3 3">
                         <circle fill="#ffb31e" stroke="black" stroke-width="0.05" cx="0.5" cy="0.5" r="0.5"></circle>
@@ -60,6 +56,14 @@
                     </symbol>
                 </defs>
             </svg>
+
+            <div class="puzzle-selector">
+                <label for="puzzles">Puzzle</label>
+                <select id="puzzles" name="puzzles">
+                </select>
+                <button class="button load">Load</button>
+                <button class="button random">Random</button>
+            </div>
         </div>
     </div>
     <script src="main.js"></script>
