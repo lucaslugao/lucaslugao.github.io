@@ -8,7 +8,7 @@
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inria+Sans:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
     <script>
         (function() {
             const savedTheme = localStorage.getItem('theme');
@@ -20,14 +20,15 @@
 
     <style>
         :root {
-            --font-size-base: 15px;
+            --font-size-base: 14px;
+            --font-size-name: 16px;
             --line-height: 1.5;
 
             /* Spacing Scale */
-            --space-xs: 0.25rem;
-            --space-sm: 0.5rem;
-            --space-md: 1rem;
-            --space-lg: 1.5rem;
+            --space-xs: 0.125rem;
+            --space-sm: 0.25rem;
+            --space-md: 0.5rem;
+            --space-lg: 0.75rem;
 
             /* Minimalist Palette - Light (Default) */
             --color-bg: #ffffff;
@@ -68,15 +69,16 @@
         }
 
         body {
-            font-family: 'Inria Sans', sans-serif;
+            font-family: 'Google Sans Code', monospace;
             font-size: var(--font-size-base);
             line-height: var(--line-height);
+            letter-spacing: -0.02em;
             color: var(--color-text-main);
             background-color: var(--color-bg);
             -webkit-font-smoothing: antialiased;
             max-width: 540px;
             margin: 0 auto;
-            padding: var(--space-lg); 
+            padding: var(--space-lg);
         }
 
         /* Highlight Logic */
@@ -86,7 +88,15 @@
         }
 
         /* Typography */
-        h1, h2, h3 {
+        h1 {
+            font-size: var(--font-size-name);
+            font-weight: 700;
+            margin-bottom: var(--space-xs);
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        h2, h3 {
             font-size: var(--font-size-base);
             font-weight: 700;
             margin-bottom: var(--space-xs);
@@ -116,7 +126,7 @@
 
         /* Layout */
         .section {
-            margin-bottom: var(--space-lg);
+            margin-bottom: 1.5em;
         }
 
         .header {
@@ -152,6 +162,12 @@
             margin-left: var(--space-sm);
         }
 
+        .item-location {
+            color: var(--color-text-dim);
+            font-size: 0.9em;
+            padding-bottom: var(--space-xs);
+        }
+
         .item-meta {
             color: var(--color-text-dim);
             font-feature-settings: "tnum";
@@ -160,12 +176,8 @@
         }
 
         @media (max-width: 450px) {
-            .item {
-                flex-direction: column;
-                padding: var(--space-sm) 0;
-            }
             .item-meta {
-                margin-left: 0;
+                margin-left: var(--space-sm);
             }
         }
 
@@ -174,6 +186,7 @@
             gap: var(--space-md);
             flex-wrap: wrap;
         }
+
 
         /* Toggle Button */
         #theme-toggle {
@@ -260,24 +273,27 @@
             <li class="item">
                 <div>
                     <span class="item-title">Google</span>
-                    <span class="item-desc">SRE, ML Scheduling</span>
+                    <span class="item-desc"><em>London</em></span>
                 </div>
                 <span class="item-meta">2022&ndash;</span>
             </li>
+            <li class="item-location">SRE, ML Scheduling</li>
             <li class="item">
                 <div>
-                    <span class="item-title">Datakalab</span>
-                    <span class="item-desc">Founding Engineer (acq. Apple)</span>
+                    <span class="item-title">Datakalab (acq. Apple)</span>
+                    <span class="item-desc"><em>Paris</em></span>
                 </div>
                 <span class="item-meta">2018&ndash;2022</span>
             </li>
+            <li class="item-location">Founding Engineer</li>
             <li class="item">
                 <div>
                     <span class="item-title">Verily Life Sciences</span>
-                    <span class="item-desc">SWE Intern</span>
+                    <span class="item-desc"><em>Mountain View</em></span>
                 </div>
                 <span class="item-meta">2018</span>
             </li>
+            <li class="item-location">SWE Intern</li>
         </ul>
     </section>
 
@@ -288,14 +304,17 @@
                 <span class="item-title">École Polytechnique</span>
                 <span class="item-meta">X15</span>
             </li>
+            <li class="item-location"><em>Paris</em></li>
             <li class="item">
                 <span class="item-title">Instituto Tecnológico de Aeronáutica</span>
                 <span class="item-meta">T18</span>
             </li>
+            <li class="item-location"><em>Brazil</em></li>
         </ul>
     </section>
 
     <section class="section">
+        <h2>Contact</h2>
         <div class="links">
             <a href="mailto:lucaslugaoguimaraes@gmail.com">Email</a>
             <a href="https://github.com/lucaslugao">GitHub</a>
