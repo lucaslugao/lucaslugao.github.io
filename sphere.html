@@ -3,247 +3,340 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>3D Sphere Viewer</title>
+    <title>3D Sphere Viewer & Lab</title>
     <style>
         * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            outline: none;
+            margin: 0; padding: 0; box-sizing: border-box; outline: none;
             -webkit-tap-highlight-color: transparent;
         }
         body, html {
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background-color: #000000;
-            touch-action: none;
+            width: 100%; height: 100%; overflow: hidden;
+            background-color: #000000; touch-action: none;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         }
-        canvas {
-            display: block;
-            width: 100vw;
-            height: 100vh;
-        }
+        canvas { display: block; width: 100vw; height: 100vh; }
         
+        #control-center {
+            position: absolute; top: 20px; left: 20px;
+            width: 360px; max-width: calc(100vw - 40px); max-height: calc(100vh - 40px);
+            background: rgba(10, 10, 15, 0.85); border: 1px solid rgba(255, 255, 255, 0.08);
+            color: #e4e4e7; border-radius: 16px; display: flex; flex-direction: column;
+            z-index: 1000; backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+            box-shadow: 0 30px 60px rgba(0,0,0,0.8);
+            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease, visibility 0.4s;
+        }
+        #control-center.ui-hidden {
+            transform: translateX(-400px); opacity: 0; pointer-events: none; visibility: hidden;
+        }
+
+        .panel-header { padding: 16px 20px 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+        .panel-header h1 { font-size: 14px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: #fff; opacity: 0.9; }
+        .tabs-container { display: flex; gap: 4px; padding-top: 8px; overflow-x: auto; scrollbar-width: none; }
+        .tabs-container::-webkit-scrollbar { display: none; }
+        
+        .tab-btn {
+            background: transparent; border: none; color: #a1a1aa; padding: 10px;
+            cursor: pointer; border-radius: 8px; transition: all 0.2s ease;
+            display: flex; align-items: center; justify-content: center; flex: 1 0 auto;
+        }
+        .tab-btn .tab-icon { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        .tab-btn:hover { color: #ffffff; background: rgba(255, 255, 255, 0.05); }
+        .tab-btn.active { color: #007aff; background: rgba(0, 122, 255, 0.15); }
+
+        .active-tab-title {
+            font-size: 10px; font-weight: 700; color: #007aff; text-transform: uppercase;
+            letter-spacing: 0.8px; margin-top: 10px; text-align: center;
+            background: rgba(0, 122, 255, 0.08); padding: 6px; border-radius: 6px; border: 1px solid rgba(0, 122, 255, 0.15);
+        }
+
+        .panel-content { padding: 20px; overflow-y: auto; flex-grow: 1; max-height: 55vh; }
+        .panel-content::-webkit-scrollbar { width: 4px; }
+        .panel-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        
+        .section-title { font-size: 10px; font-weight: 800; color: #007aff; text-transform: uppercase; letter-spacing: 1px; margin: 6px 0 14px; opacity: 0.85; }
+        .setting-row { margin-bottom: 16px; }
+        .setting-row label { display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 6px; color: #a1a1aa; text-transform: uppercase; letter-spacing: 0.5px; }
+        .setting-row label span.value { color: #007aff; font-weight: bold; }
+
+        input[type="range"] { -webkit-appearance: none; width: 100%; height: 3px; background: rgba(255, 255, 255, 0.1); border-radius: 2px; outline: none; }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%;
+            background: #ffffff; cursor: pointer; box-shadow: 0 0 8px rgba(0, 122, 255, 0.4);
+            transition: transform 0.1s, background-color 0.1s;
+        }
+        input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.3); background: #007aff; }
+
+        .select-input, .text-input {
+            width: 100%; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08);
+            color: #ffffff; padding: 8px 12px; border-radius: 8px; font-size: 11px; cursor: pointer;
+            transition: border-color 0.2s, background-color 0.2s;
+        }
+        .select-input:focus, .text-input:focus { border-color: #007aff; background: rgba(255,255,255,0.06); }
+
+        .toggle-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; cursor: pointer; }
+        .toggle-row span { font-size: 10px; color: #a1a1aa; text-transform: uppercase; letter-spacing: 0.5px; }
+        .switch { position: relative; display: inline-block; width: 32px; height: 18px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255,255,255,0.1); transition: .3s; border-radius: 20px; }
+        .slider:before { content: ""; position: absolute; height: 12px; width: 12px; left: 3px; bottom: 3px; background-color: #e4e4e7; transition: .3s; border-radius: 50%; }
+        input:checked + .slider { background-color: #007aff; }
+        input:checked + .slider:before { transform: translateX(14px); background-color: #ffffff; }
+
+        .utility-btn, .add-light-btn {
+            background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); color: #ffffff;
+            font-size: 10px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;
+            padding: 8px 12px; border-radius: 8px; cursor: pointer; width: 100%; margin-bottom: 8px; transition: all 0.2s;
+        }
+        .utility-btn:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.15); }
+        .utility-btn.danger { color: #ff453a; border-color: rgba(255, 69, 58, 0.2); background: rgba(255, 69, 58, 0.04); }
+        .utility-btn.danger:hover { background: rgba(255, 69, 58, 0.12); border-color: rgba(255, 69, 58, 0.4); }
+        
+        .add-light-btn { background: rgba(0, 122, 255, 0.1); border: 1px dashed rgba(0, 122, 255, 0.3); color: #007aff; padding: 10px; margin-top: 10px; }
+        .add-light-btn:hover { background: rgba(0, 122, 255, 0.18); color: #ffffff; border-color: rgba(0, 122, 255, 0.5); }
+
+        .light-card { background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 12px; margin-bottom: 12px; }
+        .light-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.04); padding-bottom: 6px; }
+        .light-card-header h4 { font-size: 9px; color: #ffffff; text-transform: uppercase; font-weight: 800; letter-spacing: 0.5px; }
+        .remove-light-btn { background: transparent; border: none; color: #ff453a; font-size: 9px; cursor: pointer; text-transform: uppercase; font-weight: 700; }
+        .light-color-input { width: 32px; height: 22px; border: none; border-radius: 4px; cursor: pointer; background: transparent; }
+
         .fab {
-            position: absolute;
-            width: 56px;
-            height: 56px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-            transition: transform 0.2s, background-color 0.2s, opacity 0.5s ease, visibility 0.5s;
-            z-index: 100;
-            border: none;
+            position: absolute; width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; background: rgba(10, 10, 15, 0.55); border: 1px solid rgba(255, 255, 255, 0.06);
+            backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); z-index: 100;
         }
+        .fab:hover { background: rgba(20, 20, 28, 0.8); border-color: rgba(255, 255, 255, 0.15); }
         .fab:active { transform: scale(0.92); }
-        .fab svg { fill: white; width: 26px; height: 26px; pointer-events: none; }
+        .fab svg { fill: #a1a1aa; width: 18px; height: 18px; pointer-events: none; transition: fill 0.2s; }
+        .fab:hover svg { fill: #ffffff; }
 
-        /* Unified Positioning (20px from corners) */
-        #settings-btn { top: 20px; left: 20px; background-color: #444; }
-        #toggle-ui-btn { top: 20px; right: 20px; background-color: #333; }
-        #bg-btn { bottom: 20px; left: 20px; background-color: #444; }
-        #action-btn { bottom: 20px; right: 20px; background-color: #222; }
+        #settings-toggle-btn { top: 20px; left: 20px; }
+        #toggle-ui-btn { top: 20px; right: 20px; }
+        #bg-btn { bottom: 20px; left: 20px; }
+        #action-btn { bottom: 20px; right: 20px; }
+        #settings-toggle-btn.active { background-color: rgba(0, 122, 255, 0.25); border-color: rgba(0, 122, 255, 0.5); }
+        #settings-toggle-btn.active svg { fill: #007aff; }
 
-        /* Kinetic Energy Meter */
         #ke-meter-container {
-            position: absolute;
-            bottom: 25px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 220px;
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(10px);
-            padding: 12px 18px;
-            border-radius: 16px;
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            z-index: 90;
-            transition: opacity 0.5s ease, visibility 0.5s;
-            pointer-events: none;
+            position: absolute; bottom: 25px; left: 50%; transform: translateX(-50%); width: 240px;
+            background: rgba(10, 10, 15, 0.7); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+            padding: 12px 18px; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.06); z-index: 90;
+            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease, visibility 0.4s; pointer-events: none;
         }
-        #ke-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-end;
-            margin-bottom: 8px;
-        }
-        #ke-label {
-            color: white;
-            font-size: 10px;
-            text-transform: uppercase;
-            letter-spacing: 1.2px;
-            opacity: 0.6;
-        }
-        #ke-value {
-            color: #88ff88;
-            font-size: 14px;
-            font-weight: 700;
-            font-variant-numeric: tabular-nums;
-            min-width: 85px;
-            text-align: right;
-        }
-        #ke-bar-bg {
-            width: 100%;
-            height: 4px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 2px;
-            overflow: hidden;
-        }
-        #ke-bar-fill {
-            width: 0%;
-            height: 100%;
-            background: #88ff88;
-            box-shadow: 0 0 10px #88ff88;
-        }
-
-        #settings-panel {
-            position: absolute;
-            top: 85px;
-            left: 20px;
-            background: rgba(0, 0, 0, 0.85);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            color: white;
-            padding: 15px;
-            border-radius: 12px;
-            display: none;
-            z-index: 1000;
-            width: 240px;
-            backdrop-filter: blur(10px);
-        }
-        #settings-panel.visible { display: block; }
-        
-        .setting-row { margin-bottom: 12px; }
-        .setting-row label { display: block; font-size: 11px; margin-bottom: 4px; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.5px; }
-        .setting-row input[type="range"] { width: 100%; cursor: pointer; }
-        
-        .toggle-row {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-top: 5px;
-            padding-top: 10px;
-            border-top: 1px solid rgba(255,255,255,0.1);
-            cursor: pointer;
-        }
-        .toggle-row input { cursor: pointer; width: 16px; height: 16px; }
+        #ke-meter-container.ui-hidden { transform: translate(-50%, 80px); opacity: 0; visibility: hidden; }
+        #ke-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px; }
+        #ke-label { color: #8e8e93; font-size: 9px; text-transform: uppercase; letter-spacing: 1.2px; }
+        #ke-value { color: #30d158; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+        #ke-bar-bg { width: 100%; height: 3px; background: rgba(255, 255, 255, 0.08); border-radius: 2px; overflow: hidden; }
+        #ke-bar-fill { width: 0%; height: 100%; background: linear-gradient(90deg, #30d158, #007aff); box-shadow: 0 0 8px rgba(48, 209, 88, 0.4); transition: width 0.1s ease; }
 
         #picker-container {
-            position: absolute;
-            left: 20px;
-            bottom: 85px;
-            background: rgba(255, 255, 255, 0.95);
-            padding: 12px;
-            border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
-            backdrop-filter: blur(10px);
-            display: none;
-            z-index: 1000;
-            opacity: 0;
-            transition: opacity 0.3s ease, transform 0.3s ease;
-            transform: translateY(10px);
+            position: absolute; left: 20px; bottom: 85px; background: rgba(10, 10, 15, 0.85); padding: 16px; border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 15px 40px rgba(0,0,0,0.6); backdrop-filter: blur(20px);
+            display: none; z-index: 1000; opacity: 0; transition: opacity 0.3s, transform 0.3s; transform: translateY(15px);
         }
-        #picker-container.visible {
-            display: block;
-            opacity: 1;
-            transform: translateY(0);
-        }
+        #picker-container.visible { display: block; opacity: 1; transform: translateY(0); }
 
-        .ui-hidden {
-            opacity: 0 !important;
-            pointer-events: none !important;
-            visibility: hidden !important;
-        }
+        .ui-element { transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.4s; }
+        .ui-element.ui-hidden { opacity: 0 !important; pointer-events: none !important; visibility: hidden !important; transform: translateY(15px); }
 
-        #file-input { display: none; }
+        #toast {
+            position: absolute; top: 25px; left: 50%; transform: translateX(-50%) translateY(-50px);
+            background: rgba(0, 122, 255, 0.85); color: white; padding: 10px 20px; border-radius: 30px;
+            font-size: 11px; font-weight: 700; box-shadow: 0 10px 25px rgba(0,122,255,0.3); z-index: 2000;
+            pointer-events: none; opacity: 0; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); backdrop-filter: blur(8px);
+        }
+        #toast.visible { transform: translateX(-50%) translateY(0); opacity: 1; }
+        #file-input, #skybox-file-input { display: none; }
+
+        /* Manual Paste Modal */
+        #paste-modal {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(10, 10, 15, 0.95); padding: 20px; border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1); z-index: 3000; width: 320px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8); backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px); display: flex; flex-direction: column; gap: 12px;
+            transition: opacity 0.3s, transform 0.3s, visibility 0.3s;
+        }
+        #paste-modal.ui-hidden { opacity: 0; visibility: hidden; pointer-events: none; transform: translate(-50%, -40%); }
+        #paste-textarea {
+            width: 100%; height: 120px; background: rgba(255,255,255,0.05); color: #007aff;
+            border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 10px;
+            font-family: monospace; font-size: 10px; resize: none; outline: none;
+        }
+        #paste-textarea:focus { border-color: #007aff; background: rgba(255,255,255,0.08); }
     </style>
 </head>
 <body>
-    
-    <div id="settings-panel">
-        <div class="setting-row">
-            <label id="sensitivity-label">Impulse Sensitivity: 0.10</label>
-            <input type="range" id="sensitivity-range" min="0.0001" max="0.01" step="0.0001" value="0.0010">
+    <div id="control-center" class="ui-hidden">
+        <div class="panel-header">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <h1>Engine Control</h1>
+                <button id="close-deck-btn" style="background: transparent; border: none; color: #a1a1aa; cursor: pointer; padding: 4px;" title="Close Panel">
+                    <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: currentColor;"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                </button>
+            </div>
+            <div class="tabs-container">
+                <button class="tab-btn active" data-tab="tab-material" data-title="Sphere Surface" title="Sphere Properties"><svg class="tab-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><path d="M2 12h20"/></svg></button>
+                <button class="tab-btn" data-tab="tab-lights" data-title="System Lights" title="Dynamic Light Sources"><svg class="tab-icon" viewBox="0 0 24 24"><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41M12 7a5 5 0 1 0 5 5 5 5 0 0 0-5-5z"/></svg></button>
+                <button class="tab-btn" data-tab="tab-background" data-title="Space Background" title="Cosmic Background Maps"><svg class="tab-icon" viewBox="0 0 24 24"><path d="M12 3l1.91 5.89h6.19l-5.01 3.64 1.91 5.89-5-3.64-5 3.64 1.91-5.89-5.01-3.64h6.19L12 3z"/></svg></button>
+                <button class="tab-btn" data-tab="tab-physics" data-title="Physics Lab" title="Rotational Physics & Inertia"><svg class="tab-icon" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></button>
+                <button class="tab-btn" data-tab="tab-utility" data-title="System Utilities" title="Configurations Import/Export"><svg class="tab-icon" viewBox="0 0 24 24"><path d="M19.14 12.94a2.91 2.91 0 0 0 0-1.88l2.03-1.58a.5.5 0 0 0 .12-.61l-1.92-3.32a.5.5 0 0 0-.59-.22l-2.39.96a2.91 2.91 0 0 0-1.62-.94l-.36-2.54a.5.5 0 0 0-.48-.41h-3.84a.5.5 0 0 0-.47.41l-.36 2.54a2.91 2.91 0 0 0-1.62.94l-2.39-.96a.5.5 0 0 0-.59.22L2.74 8.87a.5.5 0 0 0 .12.61l2.03 1.58a2.91 2.91 0 0 0 0 1.88l-2.03 1.58a.5.5 0 0 0-.12.61l1.92 3.32a.5.5 0 0 0 .59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54a.5.5 0 0 0 .48.41h3.84a.5.5 0 0 0 .47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96a.5.5 0 0 0 .59-.22l1.92-3.32a.5.5 0 0 0-.12-.61zM12 15.6a3.6 3.6 0 1 1 3.6-3.6 3.6 3.6 0 0 1-3.6 3.6z"/></svg></button>
+            </div>
+            <div class="active-tab-title" id="active-tab-title">Sphere Surface</div>
         </div>
-        <div class="setting-row">
-            <label id="friction-label">Friction / Drag: 0.000</label>
-            <input type="range" id="friction-range" min="0.000" max="0.1" step="0.001" value="0.000">
+
+        <div class="panel-content">
+            <div id="tab-material" class="tab-content active">
+                <div class="section-title">Surface Properties</div>
+                <div class="setting-row">
+                    <label>Texture Map</label>
+                    <select class="select-input" id="texture-selector">
+                        <option value="checkerboard">Procedural Checkerboard</option>
+                        <option value="custom">Uploaded Custom Texture</option>
+                    </select>
+                </div>
+                <div class="toggle-row">
+                    <span>Lambertian Material</span>
+                    <label class="switch"><input type="checkbox" id="input-useLambert"><span class="slider"></span></label>
+                </div>
+                <!-- Dynamic inputs bound via JS config pattern -->
+                <div class="setting-row"><label>Roughness <span class="value" id="val-roughness">1.00</span></label><input type="range" id="input-roughness" min="0" max="1" step="0.01"></div>
+                <div class="setting-row"><label>Metalness <span class="value" id="val-metalness">0.53</span></label><input type="range" id="input-metalness" min="0" max="1" step="0.01"></div>
+                <div class="setting-row"><label>Ambient Int. <span class="value" id="val-ambient">2.00</span></label><input type="range" id="input-ambient" min="0" max="4" step="0.05"></div>
+                <div class="setting-row"><label>Diffuse Albedo <span class="value" id="val-albedo">2.00</span></label><input type="range" id="input-albedo" min="0.1" max="4" step="0.05"></div>
+            </div>
+
+            <div id="tab-lights" class="tab-content">
+                <div class="section-title">Dynamic Light Sources</div>
+                <div id="lights-list-container"></div>
+                <button class="add-light-btn" id="add-light-btn">+ Add Dynamic Source</button>
+            </div>
+
+            <div id="tab-background" class="tab-content">
+                <div class="section-title">Space Ambient Map</div>
+                <div class="setting-row">
+                    <label>Ambient Mode</label>
+                    <select class="select-input" id="space-mode">
+                        <option value="solid">Solid Background Color</option>
+                        <option value="nebula">Procedural Gas Nebula</option>
+                        <option value="customSkybox">Custom Uploaded Skybox</option>
+                    </select>
+                </div>
+                <div class="setting-row" id="skybox-upload-row" style="display: none;">
+                    <label>Upload Space Image</label>
+                    <button class="utility-btn" onclick="document.getElementById('skybox-file-input').click()">Select Skybox Image</button>
+                </div>
+                <div class="section-title">Cosmic Starfield</div>
+                <div class="toggle-row">
+                    <span>Enable Stars</span>
+                    <label class="switch"><input type="checkbox" id="input-stars-toggle"><span class="slider"></span></label>
+                </div>
+                <div class="setting-row">
+                    <label>Noise Distribution</label>
+                    <select class="select-input" id="stars-distribution">
+                        <option value="blue">Blue Noise (Even Dispersion)</option>
+                        <option value="white">White Noise (Clustered Drift)</option>
+                    </select>
+                </div>
+                <div class="setting-row"><label>Star Density <span class="value" id="val-stars-count">1500</span></label><input type="range" id="input-stars-count" min="200" max="4000" step="100"></div>
+                <div class="setting-row"><label>Star Core Size <span class="value" id="val-stars-size">2.20</span></label><input type="range" id="input-stars-size" min="0.5" max="5.0" step="0.1"></div>
+            </div>
+
+            <div id="tab-physics" class="tab-content">
+                <div class="section-title">Dynamics & Rotational Inertia</div>
+                <div class="setting-row"><label>Sensitivity <span class="value" id="val-sensitivity">0.0010</span></label><input type="range" id="input-sensitivity" min="0.0001" max="0.01" step="0.0001"></div>
+                <div class="setting-row"><label>Friction / Drag <span class="value" id="val-friction">0.000</span></label><input type="range" id="input-friction" min="0.000" max="0.1" step="0.001"></div>
+                <div class="toggle-row">
+                    <span>Inertial Flick Mode</span>
+                    <label class="switch"><input type="checkbox" id="input-inertia"><span class="slider"></span></label>
+                </div>
+            </div>
+
+            <div id="tab-utility" class="tab-content">
+                <div class="section-title">System Configurations</div>
+                <button class="utility-btn" id="btn-copy">Copy Config to Clipboard</button>
+                <button class="utility-btn" id="btn-load">Load Config from Clipboard</button>
+                <button class="utility-btn danger" id="btn-reset">Reset System Defaults</button>
+            </div>
         </div>
-        <label class="toggle-row">
-            <input type="checkbox" id="inertia-toggle" checked>
-            <span style="font-size: 11px; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.5px;">Inertial Flick Mode</span>
-        </label>
     </div>
 
-    <div id="picker-container">
-        <div id="iro-picker"></div>
+    <div id="picker-container"><div id="iro-picker"></div></div>
+
+    <div id="ke-meter-container" class="ui-element ui-hidden">
+        <div id="ke-header"><span id="ke-label">Rotational Energy</span><span id="ke-value">0.00 J</span></div>
+        <div id="ke-bar-bg"><div id="ke-bar-fill"></div></div>
     </div>
 
-    <div id="ke-meter-container" class="ui-element">
-        <div id="ke-header">
-            <span id="ke-label">Kinetic Energy</span>
-            <span id="ke-value">0.00 J</span>
-        </div>
-        <div id="ke-bar-bg">
-            <div id="ke-bar-fill"></div>
-        </div>
-    </div>
+    <button id="settings-toggle-btn" class="fab ui-element ui-hidden" title="Toggle Engine Deck"><svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg></button>
+    <button id="toggle-ui-btn" class="fab" title="Toggle Dashboard Visibility"><svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg></button>
+    <button id="bg-btn" class="fab ui-element ui-hidden" title="Solid Background Color Tone"><svg viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg></button>
+    <button id="action-btn" class="fab ui-element ui-hidden" title="Upload Custom Sphere Texture"><svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></svg></button>
 
-    <button id="toggle-ui-btn" class="fab" title="Toggle UI">
-        <svg id="eye-icon" viewBox="0 0 24 24">
-            <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
-        </svg>
-    </button>
-
-    <button id="settings-btn" class="fab ui-element" title="Physics Settings">
-        <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
-    </button>
-
-    <button id="bg-btn" class="fab ui-element" title="Background Color">
-        <svg viewBox="0 0 24 24">
-            <path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
-        </svg>
-    </button>
-
-    <button id="action-btn" class="fab ui-element">
-        <span id="btn-icon">
-            <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></svg>
-        </span>
-    </button>
+    <div id="toast">Ready</div>
     <input type="file" id="file-input" accept="image/*">
+    <input type="file" id="skybox-file-input" accept="image/*">
+
+    <div id="paste-modal" class="ui-hidden">
+        <h3 style="color: #fff; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Manual Config Import</h3>
+        <p style="color: #a1a1aa; font-size: 10px; line-height: 1.4;">Clipboard access restricted by browser sandbox. Please paste your JSON configuration below:</p>
+        <textarea id="paste-textarea" placeholder='{"settings": {...}, "lights": [...]}'></textarea>
+        <div style="display: flex; gap: 8px;">
+            <button id="paste-cancel-btn" class="utility-btn danger" style="margin: 0;">Cancel</button>
+            <button id="paste-confirm-btn" class="utility-btn" style="background: rgba(0, 122, 255, 0.2); border-color: rgba(0, 122, 255, 0.5); color: #007aff; margin: 0;">Load Config</button>
+        </div>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@jaames/iro@5"></script>
-    <script type="importmap">
-        { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
-    </script>
+    <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }</script>
 
     <script type="module">
         import * as THREE from 'three';
 
-        let scene, camera, renderer, sphereMesh;
-        let isDragging = false;
-        let previousMousePosition = { x: 0, y: 0 };
+        const DEFAULT_CONFIG = {
+            useLambert: false,
+            roughness: 1, metalness: 0.73, ambient: 0.7, albedo: 0.4,
+            spaceMode: "solid", customSolidColor: "#000000",
+            starsEnabled: false, starsDistribution: "blue", starsCount: 1500, starsSize: 2.2,
+            sensitivity: 0.001, friction: 0, inertia: true
+        };
+        const DEFAULT_LIGHTS = [
+            { id: 1, type: 'distant', azimuth: 90, polar: 90, distance: 3, intensity: 15, color: '#ffffff' }
+        ];
+
+        let currentConfig = { ...DEFAULT_CONFIG };
+        let customLights = JSON.parse(JSON.stringify(DEFAULT_LIGHTS));
+        let nextLightId = 2;
+
+        // Core App Elements
+        let scene, camera, renderer, sphereMesh, coreMesh;
+        let starfieldParticles, proceduralSpaceMap, customSkyboxMap, proceduralCheckerboard;
         
-        let rotationAxis = new THREE.Vector3(0, 1, 0);
-        let rotationVelocity = 0;
-        let frictionAmount = 0.0; 
-        let sensitivity = 0.001;
-        let isInertiaMode = true;
+        // Interaction & Dynamics State
+        let isDragging = false, previousMousePos = { x: 0, y: 0 };
+        let rotationAxis = new THREE.Vector3(0, 1, 0), rotationVelocity = 0.0;
+        let currentZoom = 8.5, initialPinchDist = 0, initialZoom = 0;
+        let uploadTextureCached = null, hasCustomImage = false;
+        let uiVisible = false, systemVisible = false, colorPicker = null;
 
-        let currentZoom = 9.0;
-        let initialPinchDistance = 0, initialZoom = 0;
-        let hasCustomImage = false;
-
-        let uiVisible = true;
-        let eyeFadeTimeout = null;
-        let keBarFill = null;
-        let keValueDisplay = null;
-
-        const uploadIcon = '<svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></svg>';
-        const trashIcon = '<svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>';
+        // Unified UI Bindings - Maps config keys to DOM inputs and application side-effects
+        const UI_BINDINGS = {
+            useLambert: { type: 'toggle', action: v => switchMaterialModel(v) },
+            roughness: { type: 'range', action: v => { if(sphereMesh.material.isMeshStandardMaterial) sphereMesh.material.roughness = v; } },
+            metalness: { type: 'range', action: v => { if(sphereMesh.material.isMeshStandardMaterial) sphereMesh.material.metalness = v; } },
+            ambient: { type: 'range', action: v => renderer.toneMappingExposure = v },
+            albedo: { type: 'range', action: v => sphereMesh.material.color.setRGB(v, v, v) },
+            starsCount: { type: 'range', id: 'stars-count', precision: 0, action: () => updateStarfield() },
+            starsSize: { type: 'range', id: 'stars-size', action: () => updateStarfield() },
+            sensitivity: { type: 'range', precision: 4 },
+            friction: { type: 'range', precision: 3 },
+            inertia: { type: 'toggle', action: v => { if(!v) rotationVelocity = 0; } },
+            starsEnabled: { type: 'toggle', id: 'stars-toggle', action: () => updateStarfield() }
+        };
 
         window.onload = init;
 
@@ -252,283 +345,428 @@
             scene.background = new THREE.Color(0x000000); 
 
             camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 0, currentZoom); 
+            camera.position.z = currentZoom; 
 
-            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
             document.body.appendChild(renderer.domElement);
 
-            const ambient = new THREE.AmbientLight(0xffffff, 0.7);
-            scene.add(ambient);
+            scene.add(new THREE.HemisphereLight(0xffffff, 0x111122, 0.4));
 
-            const sun = new THREE.DirectionalLight(0xffffff, 0.8);
-            sun.position.set(5, 10, 7.5);
-            scene.add(sun);
+            // Textures & Meshes
+            proceduralCheckerboard = createProceduralMap('checkerboard');
+            proceduralSpaceMap = createProceduralMap('space');
 
-            const geometry = new THREE.SphereGeometry(2.5, 64, 32);
-            const material = new THREE.MeshStandardMaterial({ 
-                map: createCheckerboardTexture(),
-                roughness: 0.4, metalness: 0.1
-            });
-            sphereMesh = new THREE.Mesh(geometry, material);
+            sphereMesh = new THREE.Mesh(
+                new THREE.SphereGeometry(2.5, 64, 64),
+                new THREE.MeshStandardMaterial({ map: proceduralCheckerboard, roughness: 1, metalness: 0.53, color: 0xffffff })
+            );
+            coreMesh = new THREE.Mesh(new THREE.SphereGeometry(0.3, 32, 32), new THREE.MeshBasicMaterial({ color: 0x30d158, transparent: true, opacity: 0.8 }));
+            sphereMesh.add(coreMesh);
             scene.add(sphereMesh);
 
-            const core = new THREE.Mesh(
-                new THREE.SphereGeometry(0.3, 32, 32),
-                new THREE.MeshBasicMaterial({ color: 0x88ff88, transparent: true, opacity: 0.8 })
-            );
-            sphereMesh.add(core);
-
-            keBarFill = document.getElementById('ke-bar-fill');
-            keValueDisplay = document.getElementById('ke-value');
-
-            setupInteraction();
-            setupUI();
-            window.addEventListener('resize', onWindowResize);
+            loadStorage();
+            setupUnifiedUIBindings();
+            applyConfigToApp();
+            
+            setupInteractions();
+            setupUIControllers();
+            
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
             animate();
         }
 
-        function setupUI() {
-            const actionBtn = document.getElementById('action-btn');
-            const iconSpan = document.getElementById('btn-icon');
-            const fileInput = document.getElementById('file-input');
-            const bgBtn = document.getElementById('bg-btn');
-            const settingsBtn = document.getElementById('settings-btn');
-            const toggleUiBtn = document.getElementById('toggle-ui-btn');
-            const settingsPanel = document.getElementById('settings-panel');
-            const pickerContainer = document.getElementById('picker-container');
-            const uiElements = document.querySelectorAll('.ui-element');
-            const inertiaToggle = document.getElementById('inertia-toggle');
-            const textureLoader = new THREE.TextureLoader();
-
-            toggleUiBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                uiVisible = !uiVisible;
-                uiElements.forEach(el => el.classList.toggle('ui-hidden', !uiVisible));
-                if (!uiVisible) {
-                    settingsPanel.classList.remove('visible');
-                    pickerContainer.classList.remove('visible');
-                    resetEyeFade();
-                } else {
-                    clearTimeout(eyeFadeTimeout);
-                    toggleUiBtn.style.opacity = "1";
-                    toggleUiBtn.style.visibility = "visible";
-                }
-            });
-
-            const resetEyeFade = () => {
-                if (uiVisible) return;
-                toggleUiBtn.style.opacity = "1";
-                toggleUiBtn.style.visibility = "visible";
-                clearTimeout(eyeFadeTimeout);
-                eyeFadeTimeout = setTimeout(() => {
-                    if (!uiVisible) {
-                        toggleUiBtn.style.opacity = "0";
-                        setTimeout(() => { if (!uiVisible) toggleUiBtn.style.visibility = "hidden"; }, 500);
-                    }
-                }, 5000);
-            };
-
-            window.addEventListener('mousemove', resetEyeFade);
-            window.addEventListener('touchstart', resetEyeFade);
-
-            inertiaToggle.addEventListener('change', (e) => {
-                isInertiaMode = e.target.checked;
-                rotationVelocity = 0;
-            });
-
-            document.getElementById('sensitivity-range').addEventListener('input', (e) => {
-                sensitivity = parseFloat(e.target.value);
-                document.getElementById('sensitivity-label').innerText = `Impulse Sensitivity: ${(sensitivity * 100).toFixed(2)}`;
-            });
-            document.getElementById('friction-range').addEventListener('input', (e) => {
-                frictionAmount = parseFloat(e.target.value);
-                document.getElementById('friction-label').innerText = `Friction / Drag: ${frictionAmount.toFixed(3)}`;
-            });
-
-            settingsBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                settingsPanel.classList.toggle('visible');
-            });
-
-            const colorPicker = new iro.ColorPicker("#iro-picker", {
-                width: 180, color: "#000000", borderWidth: 1, borderColor: "#ccc",
-            });
-
-            colorPicker.on('color:change', (color) => {
-                scene.background.set(color.hexString);
-                document.body.style.backgroundColor = color.hexString;
-            });
-
-            bgBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                pickerContainer.classList.toggle('visible');
-            });
-
-            window.addEventListener('mousedown', (e) => {
-                if (!pickerContainer.contains(e.target) && e.target !== bgBtn) pickerContainer.classList.remove('visible');
-                if (!settingsPanel.contains(e.target) && e.target !== settingsBtn) settingsPanel.classList.remove('visible');
-            });
-
-            actionBtn.addEventListener('click', () => {
-                if (hasCustomImage) {
-                    if (sphereMesh.material.map) sphereMesh.material.map.dispose();
-                    sphereMesh.material.map = createCheckerboardTexture();
-                    sphereMesh.material.needsUpdate = true;
-                    hasCustomImage = false;
-                    iconSpan.innerHTML = uploadIcon;
-                    fileInput.value = '';
-                } else { fileInput.click(); }
-            });
-
-            fileInput.addEventListener('change', (e) => {
-                const file = e.target.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onload = (ev) => {
-                        textureLoader.load(ev.target.result, (tex) => {
-                            tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-                            tex.colorSpace = THREE.SRGBColorSpace;
-                            if (sphereMesh.material.map) sphereMesh.material.map.dispose();
-                            sphereMesh.material.map = tex;
-                            sphereMesh.material.needsUpdate = true;
-                            hasCustomImage = true;
-                            iconSpan.innerHTML = trashIcon;
-                        });
-                    };
-                    reader.readAsDataURL(file);
-                }
-            });
+        function switchMaterialModel(isLambert) {
+            const oldMat = sphereMesh.material;
+            const newMat = isLambert ? 
+                new THREE.MeshLambertMaterial({ color: oldMat.color, map: oldMat.map }) : 
+                new THREE.MeshStandardMaterial({ color: oldMat.color, map: oldMat.map, roughness: currentConfig.roughness, metalness: currentConfig.metalness });
+            
+            sphereMesh.material = newMat;
+            
+            const rRow = document.getElementById('input-roughness').closest('.setting-row');
+            const mRow = document.getElementById('input-metalness').closest('.setting-row');
+            if(rRow) rRow.style.display = isLambert ? 'none' : 'block';
+            if(mRow) mRow.style.display = isLambert ? 'none' : 'block';
         }
 
-        function createCheckerboardTexture() {
+        function createProceduralMap(type) {
             const canvas = document.createElement('canvas');
-            canvas.width = 1024; canvas.height = 512;
             const ctx = canvas.getContext('2d');
-            const cols = 16, rows = 8;
-            const w = 1024 / cols, h = 512 / rows;
-            for (let i = 0; i < cols; i++) {
-                for (let j = 0; j < rows; j++) {
-                    ctx.fillStyle = (i + j) % 2 === 0 ? '#ffffff' : '#999999';
-                    ctx.fillRect(i * w, j * h, w, h);
+            
+            if (type === 'space') {
+                canvas.width = 1024; canvas.height = 512;
+                ctx.fillStyle = '#020204'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                const colors = ['rgba(80,25,160,0.08)', 'rgba(0,122,255,0.06)', 'rgba(255,45,85,0.05)', 'rgba(48,209,88,0.03)'];
+                for (let i = 0; i < 15; i++) {
+                    const r = 150 + Math.random() * 400, rx = Math.random() * canvas.width, ry = Math.random() * canvas.height;
+                    const grad = ctx.createRadialGradient(rx, ry, 0, rx, ry, r);
+                    grad.addColorStop(0, colors[Math.floor(Math.random() * colors.length)]); grad.addColorStop(0.6, 'rgba(0,0,0,0.01)'); grad.addColorStop(1, 'rgba(0,0,0,0)');
+                    ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(rx, ry, r, 0, Math.PI * 2); ctx.fill();
+                }
+            } else { // checkerboard
+                canvas.width = 2048; canvas.height = 1024;
+                const w = 2048 / 16, h = 1024 / 8;
+                for (let i = 0; i < 16; i++) for (let j = 0; j < 8; j++) {
+                    ctx.fillStyle = (i + j) % 2 === 0 ? '#ffffff' : '#3a3a42'; ctx.fillRect(i * w, j * h, w, h);
                 }
             }
-            const texture = new THREE.CanvasTexture(canvas);
-            texture.colorSpace = THREE.SRGBColorSpace;
-            return texture;
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.colorSpace = THREE.SRGBColorSpace;
+            if (type === 'space') tex.mapping = THREE.EquirectangularReflectionMapping;
+            return tex;
         }
 
-        function setupInteraction() {
-            const getDist = (t) => Math.hypot(t[0].pageX - t[1].pageX, t[0].pageY - t[1].pageY);
+        function updateStarfield() {
+            if (starfieldParticles) scene.remove(starfieldParticles);
+            if (!currentConfig.starsEnabled) return;
 
-            const onMove = (x, y) => {
-                if (!isDragging) return;
-                const deltaX = x - previousMousePosition.x;
-                const deltaY = y - previousMousePosition.y;
-                const moveAxis = new THREE.Vector3(deltaY, deltaX, 0);
-                const moveDistance = moveAxis.length();
+            const positions = [], colors = [];
+            const r = (c) => Math.random() * c;
+            
+            for (let i = 0; i < currentConfig.starsCount; i++) {
+                const theta = r(Math.PI * 2), phi = Math.acos((r(2)) - 1), rad = 140 + r(160);
+                positions.push(rad * Math.sin(phi) * Math.cos(theta), rad * Math.sin(phi) * Math.sin(theta), rad * Math.cos(phi));
+                const chance = r(1);
+                colors.push(...(chance < 0.22 ? [0.72, 0.85, 1.0] : chance < 0.38 ? [1.0, 0.9, 0.78] : [1.0, 1.0, 1.0]));
+            }
 
-                if (moveDistance > 0) {
-                    const newAxis = moveAxis.clone().normalize();
-                    
-                    if (isInertiaMode) {
-                        // Pure vector addition: adds continuous pushing force to existing momentum
-                        const impulse = moveDistance * sensitivity;
-                        const currentMomentum = new THREE.Vector3().copy(rotationAxis).multiplyScalar(rotationVelocity);
-                        const newImpulse = new THREE.Vector3().copy(newAxis).multiplyScalar(impulse);
+            const geo = new THREE.BufferGeometry();
+            geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+            
+            // Simple dot texture for stars
+            const canvas = document.createElement('canvas'); canvas.width = 16; canvas.height = 16;
+            const ctx = canvas.getContext('2d'), grad = ctx.createRadialGradient(8,8,0,8,8,8);
+            grad.addColorStop(0, 'rgba(255,255,255,1)'); grad.addColorStop(0.3, 'rgba(255,255,255,0.7)'); grad.addColorStop(1, 'rgba(255,255,255,0)');
+            ctx.fillStyle = grad; ctx.fillRect(0, 0, 16, 16);
+
+            starfieldParticles = new THREE.Points(geo, new THREE.PointsMaterial({
+                size: currentConfig.starsSize, vertexColors: true, transparent: true, opacity: 0.85,
+                blending: THREE.AdditiveBlending, depthWrite: false, map: new THREE.CanvasTexture(canvas)
+            }));
+            scene.add(starfieldParticles);
+        }
+
+        function handleSpaceMode() {
+            document.getElementById('skybox-upload-row').style.display = currentConfig.spaceMode === 'customSkybox' ? 'block' : 'none';
+            if (currentConfig.spaceMode === 'customSkybox' && customSkyboxMap) {
+                scene.background = scene.environment = customSkyboxMap;
+            } else if (currentConfig.spaceMode === 'solid') {
+                scene.background = new THREE.Color(currentConfig.customSolidColor);
+                document.body.style.backgroundColor = currentConfig.customSolidColor;
+                scene.environment = null;
+            } else {
+                scene.background = scene.environment = proceduralSpaceMap;
+            }
+        }
+
+        function applyTextureMode(val) {
+            sphereMesh.material.map = val === 'custom' && uploadTextureCached ? uploadTextureCached : proceduralCheckerboard;
+            coreMesh.visible = true;
+            sphereMesh.material.needsUpdate = true;
+        }
+
+        // --- Core UI Binding Engine ---
+        function setupUnifiedUIBindings() {
+            Object.entries(UI_BINDINGS).forEach(([key, config]) => {
+                const domId = `input-${config.id || key}`;
+                const el = document.getElementById(domId);
+                if (!el) return;
+
+                if (config.type === 'range') {
+                    el.addEventListener('input', e => {
+                        const v = parseFloat(e.target.value);
+                        currentConfig[key] = v;
+                        document.getElementById(`val-${config.id || key}`).innerText = v.toFixed(config.precision !== undefined ? config.precision : 2) + (config.suffix || '');
+                        if(config.action) config.action(v);
+                        saveStorage();
+                    });
+                } else if (config.type === 'toggle') {
+                    el.addEventListener('change', e => {
+                        currentConfig[key] = e.target.checked;
+                        if(config.action) config.action(e.target.checked);
+                        saveStorage();
+                    });
+                }
+            });
+
+            // Independent Selectors
+            document.getElementById('space-mode').addEventListener('change', e => { currentConfig.spaceMode = e.target.value; handleSpaceMode(); saveStorage(); });
+            document.getElementById('stars-distribution').addEventListener('change', e => { currentConfig.starsDistribution = e.target.value; updateStarfield(); saveStorage(); });
+            document.getElementById('texture-selector').addEventListener('change', e => applyTextureMode(e.target.value));
+        }
+
+        function applyConfigToApp() {
+            Object.entries(UI_BINDINGS).forEach(([key, config]) => {
+                const el = document.getElementById(`input-${config.id || key}`);
+                if (!el) return;
+                const v = currentConfig[key];
+                
+                if (config.type === 'range') {
+                    el.value = v;
+                    document.getElementById(`val-${config.id || key}`).innerText = v.toFixed(config.precision !== undefined ? config.precision : 2) + (config.suffix || '');
+                } else if (config.type === 'toggle') {
+                    el.checked = v;
+                }
+                if (config.action) config.action(v);
+            });
+            
+            document.getElementById('space-mode').value = currentConfig.spaceMode;
+            document.getElementById('stars-distribution').value = currentConfig.starsDistribution;
+            handleSpaceMode();
+            renderCustomLights();
+        }
+
+        function loadStorage() {
+            try {
+                const cfg = localStorage.getItem('sphere_viewer_config');
+                if (cfg) currentConfig = { ...DEFAULT_CONFIG, ...JSON.parse(cfg) };
+                const lts = localStorage.getItem('sphere_viewer_lights');
+                if (lts && JSON.parse(lts).length > 0) {
+                    customLights = JSON.parse(lts).map(l => ({ ...l, lightInstance: null }));
+                    nextLightId = customLights.reduce((m, l) => Math.max(m, l.id), 0) + 1;
+                }
+            } catch(e) {}
+        }
+
+        function saveStorage() {
+            try {
+                localStorage.setItem('sphere_viewer_config', JSON.stringify(currentConfig));
+                localStorage.setItem('sphere_viewer_lights', JSON.stringify(customLights.map(({id, type, azimuth, polar, distance, intensity, color}) => ({id, type, azimuth, polar, distance, intensity, color}))));
+            } catch(e) {}
+        }
+
+        function renderCustomLights() {
+            const cont = document.getElementById('lights-list-container');
+            cont.innerHTML = customLights.length ? '' : `<div style="text-align:center; padding:15px 0; color:#666; font-size:10px; text-transform:uppercase;">No active light points.</div>`;
+            
+            customLights.forEach(light => {
+                if (!light.lightInstance) {
+                    light.lightInstance = light.type === 'distant' ? new THREE.DirectionalLight(light.color, light.intensity) : new THREE.PointLight(light.color, light.intensity, 30);
+                    scene.add(light.lightInstance);
+                }
+                updateLightTransform(light);
+
+                const card = document.createElement('div'); card.className = 'light-card';
+                card.innerHTML = `
+                    <div class="light-card-header"><h4>${light.id === 1 ? 'Primary Sun' : 'Light Source #' + light.id}</h4>${light.id === 1 ? '' : `<button class="remove-light-btn" onclick="removeLight(${light.id})">Delete</button>`}</div>
+                    <div class="setting-row"><label>Type</label><select class="select-input" onchange="updateLight(${light.id}, 'type', this.value)"><option value="point" ${light.type==='point'?'selected':''}>Point Light</option><option value="distant" ${light.type==='distant'?'selected':''}>Directional</option></select></div>
+                    <div class="setting-row"><div style="display:flex; justify-content:space-between; margin-bottom:5px;"><label style="margin:0;">Color</label><input type="color" class="light-color-input" value="${light.color}" oninput="updateLight(${light.id}, 'color', this.value)"></div></div>
+                    <div class="setting-row"><label>Intensity <span class="value" id="val-lt-${light.id}-intensity">${light.intensity.toFixed(2)}</span></label><input type="range" min="0" max="50" step="0.1" value="${light.intensity}" oninput="updateLight(${light.id}, 'intensity', this.value)"></div>
+                    <div class="setting-row"><label>Azimuth <span class="value" id="val-lt-${light.id}-azimuth">${light.azimuth}°</span></label><input type="range" min="0" max="360" step="1" value="${light.azimuth}" oninput="updateLight(${light.id}, 'azimuth', this.value)"></div>
+                    <div class="setting-row"><label>Polar <span class="value" id="val-lt-${light.id}-polar">${light.polar}°</span></label><input type="range" min="0" max="180" step="1" value="${light.polar}" oninput="updateLight(${light.id}, 'polar', this.value)"></div>
+                    <div class="setting-row" id="dist-row-${light.id}" style="display: ${light.type==='distant'?'none':'block'}"><label>Distance <span class="value" id="val-lt-${light.id}-distance">${light.distance.toFixed(1)}</span></label><input type="range" min="3" max="20" step="0.5" value="${light.distance}" oninput="updateLight(${light.id}, 'distance', this.value)"></div>
+                `;
+                cont.appendChild(card);
+            });
+        }
+
+        window.removeLight = (id) => {
+            const idx = customLights.findIndex(l => l.id === id);
+            if (idx > -1) { scene.remove(customLights[idx].lightInstance); customLights.splice(idx, 1); saveStorage(); renderCustomLights(); toast(`Removed Light #${id}`); }
+        };
+
+        window.updateLight = (id, prop, val) => {
+            const l = customLights.find(x => x.id === id);
+            if (!l) return;
+            
+            if (['azimuth','polar','distance','intensity'].includes(prop)) {
+                l[prop] = parseFloat(val);
+                const suffixes = { azimuth: '°', polar: '°' };
+                document.getElementById(`val-lt-${id}-${prop}`).innerText = prop==='intensity'?l.intensity.toFixed(2):l[prop] + (suffixes[prop]||'');
+                if(prop === 'intensity') l.lightInstance.intensity = l.intensity;
+            } else if (prop === 'color') { l.color = val; l.lightInstance.color.set(val); }
+            else if (prop === 'type') {
+                scene.remove(l.lightInstance); l.type = val;
+                l.lightInstance = val === 'distant' ? new THREE.DirectionalLight(l.color, l.intensity) : new THREE.PointLight(l.color, l.intensity, 30);
+                document.getElementById(`dist-row-${id}`).style.display = val === 'distant' ? 'none' : 'block';
+                scene.add(l.lightInstance);
+            }
+            updateLightTransform(l); saveStorage();
+        };
+
+        function updateLightTransform(l) {
+            const az = l.azimuth * Math.PI/180, pol = l.polar * Math.PI/180, d = l.type === 'distant' ? 15 : l.distance;
+            l.lightInstance.position.set(d * Math.sin(pol) * Math.cos(az), d * Math.cos(pol), d * Math.sin(pol) * Math.sin(az));
+        }
+
+        function setupUIControllers() {
+            // Tab switching
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', e => {
+                document.querySelectorAll('.tab-btn, .tab-content').forEach(el => el.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById(btn.dataset.tab).classList.add('active');
+                document.getElementById('active-tab-title').innerText = btn.dataset.title;
+            }));
+
+            // FABs and Overlays
+            const toggleSystemBtn = document.getElementById('toggle-ui-btn');
+            const deck = document.getElementById('control-center');
+            
+            toggleSystemBtn.addEventListener('click', () => {
+                systemVisible = !systemVisible;
+                document.querySelectorAll('.ui-element').forEach(el => {
+                    if (el === deck && !uiVisible) return;
+                    el.classList.toggle('ui-hidden', !systemVisible);
+                });
+                if (!systemVisible) document.getElementById('picker-container').classList.remove('visible');
+            });
+
+            document.getElementById('settings-toggle-btn').addEventListener('click', e => {
+                uiVisible = !uiVisible; deck.classList.toggle('ui-hidden', !uiVisible); e.currentTarget.classList.toggle('active', uiVisible);
+            });
+            document.getElementById('close-deck-btn').addEventListener('click', () => { uiVisible = false; deck.classList.add('ui-hidden'); document.getElementById('settings-toggle-btn').classList.remove('active'); });
+
+            // Utilities
+            document.getElementById('btn-copy').addEventListener('click', () => {
+                const pkg = { settings: currentConfig, lights: customLights.map(({id, lightInstance, ...rest}) => rest) };
+                navigator.clipboard.writeText(JSON.stringify(pkg)).then(() => toast("Config Copied!")).catch(() => {
+                    const t = document.createElement('textarea'); t.value = JSON.stringify(pkg); document.body.appendChild(t); t.select(); document.execCommand('copy'); document.body.removeChild(t); toast("Config Copied!");
+                });
+            });
+
+            function processConfig(raw) {
+                if (!raw) return;
+                try {
+                    const pkg = JSON.parse(raw);
+                    if (pkg && typeof pkg === 'object' && pkg.settings) {
+                        currentConfig = { ...DEFAULT_CONFIG, ...pkg.settings };
+                        customLights.forEach(l => { if (l.lightInstance) scene.remove(l.lightInstance); });
                         
-                        currentMomentum.add(newImpulse);
-                        rotationVelocity = currentMomentum.length();
+                        let loadedLights = pkg.lights || [];
+                        if (loadedLights.length === 0) loadedLights = JSON.parse(JSON.stringify(DEFAULT_LIGHTS));
                         
-                        if (rotationVelocity > 0.00001) {
-                            rotationAxis.copy(currentMomentum).normalize();
+                        customLights = loadedLights.map((l, i) => ({ ...l, id: i+1, lightInstance: null }));
+                        nextLightId = customLights.length + 1;
+                        
+                        saveStorage(); applyConfigToApp(); 
+                        if (colorPicker && currentConfig.customSolidColor) colorPicker.color.hexString = currentConfig.customSolidColor;
+                        toast("Config Loaded!");
+                    } else toast("Invalid config structure.");
+                } catch(e) { console.error("Parse Error:", e); toast("Invalid format."); }
+            }
+
+            document.getElementById('btn-load').addEventListener('click', async () => {
+                let clipboardSuccess = false;
+                
+                if (navigator.clipboard && navigator.clipboard.readText) {
+                    try {
+                        const raw = await navigator.clipboard.readText();
+                        if (raw) {
+                            clipboardSuccess = true;
+                            processConfig(raw);
                         }
-                    } else {
-                        // Simple drag mode: direct rotation
-                        const impulse = moveDistance * sensitivity * 8.0;
-                        sphereMesh.rotateOnWorldAxis(newAxis, impulse);
+                    } catch (e) {
+                        console.warn("Clipboard access denied or unsupported, showing modal fallback.");
                     }
                 }
-                previousMousePosition = { x, y };
-            };
-
-            const onStart = (x, y) => {
-                isDragging = true;
-                previousMousePosition = { x, y };
-            };
-
-            const onEnd = () => {
-                isDragging = false;
-            };
-
-            window.addEventListener('mousedown', (e) => {
-                if (e.target.closest('.fab') || e.target.closest('#picker-container') || e.target.closest('#settings-panel')) return;
-                onStart(e.clientX, e.clientY);
+                
+                if (!clipboardSuccess) {
+                    const modal = document.getElementById('paste-modal');
+                    const ta = document.getElementById('paste-textarea');
+                    modal.classList.remove('ui-hidden');
+                    ta.value = ''; ta.focus();
+                }
             });
-            window.addEventListener('mousemove', (e) => onMove(e.clientX, e.clientY));
-            window.addEventListener('mouseup', onEnd);
 
-            window.addEventListener('touchstart', (e) => {
-                if (e.target.closest('.fab') || e.target.closest('#picker-container') || e.target.closest('#settings-panel')) return;
-                if (e.touches.length === 1) {
-                    onStart(e.touches[0].clientX, e.touches[0].clientY);
-                } else if (e.touches.length === 2) {
-                    isDragging = false;
-                    initialPinchDistance = getDist(e.touches);
-                    initialZoom = currentZoom;
+            document.getElementById('paste-cancel-btn').addEventListener('click', () => document.getElementById('paste-modal').classList.add('ui-hidden'));
+            document.getElementById('paste-confirm-btn').addEventListener('click', () => {
+                document.getElementById('paste-modal').classList.add('ui-hidden');
+                processConfig(document.getElementById('paste-textarea').value);
+            });
+
+            document.getElementById('btn-reset').addEventListener('click', () => {
+                currentConfig = { ...DEFAULT_CONFIG };
+                customLights.forEach(l => scene.remove(l.lightInstance)); 
+                customLights = JSON.parse(JSON.stringify(DEFAULT_LIGHTS)); 
+                nextLightId = 2;
+                saveStorage(); applyConfigToApp(); toast("Reset to defaults!");
+            });
+
+            document.getElementById('add-light-btn').addEventListener('click', () => {
+                const hex = `#${new THREE.Color(`hsl(${Math.random()*360}, 100%, 60%)`).getHexString()}`;
+                customLights.push({ id: nextLightId++, type: 'point', azimuth: 180, polar: 90, distance: 8, intensity: 1.5, color: hex, lightInstance: null });
+                saveStorage(); renderCustomLights(); toast("Added Light Source");
+            });
+
+            // Skybox and Texture Files
+            const handleFile = (input, cb) => input.addEventListener('change', e => {
+                if(e.target.files[0]) {
+                    const r = new FileReader(); r.onload = ev => new THREE.TextureLoader().load(ev.target.result, tex => cb(tex)); r.readAsDataURL(e.target.files[0]);
                 }
-            }, { passive: false });
+            });
+            handleFile(document.getElementById('skybox-file-input'), tex => { tex.mapping = THREE.EquirectangularReflectionMapping; tex.colorSpace = THREE.SRGBColorSpace; customSkyboxMap = tex; if(currentConfig.spaceMode==='customSkybox') handleSpaceMode(); toast("Skybox Loaded!"); });
+            
+            const actionBtn = document.getElementById('action-btn');
+            actionBtn.addEventListener('click', () => {
+                if (hasCustomImage) {
+                    hasCustomImage = false; uploadTextureCached = null; document.getElementById('texture-selector').value = 'checkerboard'; applyTextureMode('checkerboard'); toast("Custom texture removed");
+                } else document.getElementById('file-input').click();
+            });
+            handleFile(document.getElementById('file-input'), tex => { tex.anisotropy = renderer.capabilities.getMaxAnisotropy(); tex.colorSpace = THREE.SRGBColorSpace; uploadTextureCached = tex; hasCustomImage = true; document.getElementById('texture-selector').value = 'custom'; applyTextureMode('custom'); toast("Texture Applied!"); });
 
-            window.addEventListener('touchmove', (e) => {
-                if (e.touches.length === 1) {
-                    onMove(e.touches[0].clientX, e.touches[0].clientY);
-                } else if (e.touches.length === 2) {
-                    const ratio = initialPinchDistance / getDist(e.touches);
-                    currentZoom = Math.max(4, Math.min(20, initialZoom * ratio));
-                    camera.position.z = currentZoom;
-                }
-            }, { passive: false });
-
-            window.addEventListener('touchend', onEnd);
-            window.addEventListener('wheel', (e) => {
-                currentZoom = Math.max(4, Math.min(20, currentZoom + e.deltaY * 0.01));
-                camera.position.z = currentZoom;
-            }, { passive: false });
+            // Color Picker setup
+            colorPicker = new iro.ColorPicker("#iro-picker", { width: 170, color: currentConfig.customSolidColor, borderWidth: 1, borderColor: "#222" });
+            colorPicker.on('color:change', c => { currentConfig.customSolidColor = c.hexString; saveStorage(); if(currentConfig.spaceMode==='solid') handleSpaceMode(); });
+            const pickerCont = document.getElementById('picker-container'), bgBtn = document.getElementById('bg-btn');
+            bgBtn.addEventListener('click', e => { e.stopPropagation(); pickerCont.classList.toggle('visible'); });
+            window.addEventListener('mousedown', e => { if(!pickerCont.contains(e.target) && e.target !== bgBtn) pickerCont.classList.remove('visible'); });
         }
 
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
+        function setupInteractions() {
+            const move = (x, y) => {
+                if (!isDragging) return;
+                const d = new THREE.Vector3(y - previousMousePos.y, x - previousMousePos.x, 0), len = d.length();
+                if (len > 0) {
+                    const axis = d.clone().normalize();
+                    if (currentConfig.inertia) {
+                        const m = rotationAxis.clone().multiplyScalar(rotationVelocity).add(axis.multiplyScalar(len * currentConfig.sensitivity));
+                        rotationVelocity = m.length(); if (rotationVelocity > 1e-5) rotationAxis.copy(m).normalize();
+                    } else sphereMesh.rotateOnWorldAxis(axis, len * currentConfig.sensitivity * 8);
+                }
+                previousMousePos = { x, y };
+            };
+
+            const start = (x,y) => { isDragging = true; previousMousePos = {x,y}; };
+            const isValidTgt = t => !t.closest('#control-center') && !t.closest('.fab') && !t.closest('#picker-container');
+
+            window.addEventListener('mousedown', e => { if(isValidTgt(e.target)) start(e.clientX, e.clientY); });
+            window.addEventListener('mousemove', e => move(e.clientX, e.clientY));
+            window.addEventListener('mouseup', () => isDragging = false);
+
+            window.addEventListener('touchstart', e => {
+                if(!isValidTgt(e.target)) return;
+                if(e.touches.length === 1) start(e.touches[0].clientX, e.touches[0].clientY);
+                else if(e.touches.length === 2) { isDragging = false; initialPinchDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY); initialZoom = currentZoom; }
+            }, {passive:false});
+            window.addEventListener('touchmove', e => {
+                if(e.touches.length === 1) move(e.touches[0].clientX, e.touches[0].clientY);
+                else if(e.touches.length === 2) { camera.position.z = currentZoom = Math.max(4, Math.min(20, initialZoom * (initialPinchDist / Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY)))); }
+            }, {passive:false});
+            window.addEventListener('touchend', () => isDragging = false);
+            window.addEventListener('wheel', e => { if(isValidTgt(e.target)) camera.position.z = currentZoom = Math.max(4, Math.min(20, currentZoom + e.deltaY * 0.01)); }, {passive:false});
         }
+
+        const toast = txt => { const t = document.getElementById('toast'); t.innerText = txt; t.classList.add('visible'); setTimeout(() => t.classList.remove('visible'), 3000); };
 
         function animate() {
             requestAnimationFrame(animate);
-            
-            if (isInertiaMode) {
-                // Ball ALWAYS spins if it has velocity, even when finger is touching it
-                if (rotationVelocity > 0.00001) {
+            if (currentConfig.inertia) {
+                if (rotationVelocity > 1e-5) {
                     sphereMesh.rotateOnWorldAxis(rotationAxis, rotationVelocity);
-                    
-                    if (isDragging) {
-                        // High "finger friction" when holding it
-                        rotationVelocity *= 0.92;
-                    } else {
-                        // Standard friction when let go
-                        rotationVelocity *= (1.0 - frictionAmount);
-                    }
+                    rotationVelocity *= isDragging ? 0.93 : (1 - currentConfig.friction);
                 }
-            } else {
-                rotationVelocity = 0;
             }
-
-            // Energy update based on current state (either free spinning or calculated from flick)
-            const energyJoules = (rotationVelocity * rotationVelocity) * 25000;
-            const energyPercent = Math.min(100, energyJoules * 0.2); 
-
-            if (keBarFill) keBarFill.style.width = energyPercent + '%';
-            if (keValueDisplay) keValueDisplay.innerText = energyJoules.toFixed(2) + " J";
+            
+            const eJ = (rotationVelocity * rotationVelocity) * 25000;
+            document.getElementById('ke-bar-fill').style.width = Math.min(100, eJ * 0.2) + '%';
+            document.getElementById('ke-value').innerText = eJ.toFixed(2) + " J";
 
             renderer.render(scene, camera);
         }
