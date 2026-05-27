@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NYT Pips Game Parser & Solver</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- D3.js (v7) -->
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #f8fafc;
+        }
+        /* Custom scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="min-h-screen text-slate-800 flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-slate-900 text-white py-5 px-6 shadow-md border-b border-slate-800">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="bg-indigo-600 p-2.5 rounded-xl shadow-lg shadow-indigo-500/30 flex items-center justify-center">
+                    <i data-lucide="grid-3x3" class="w-6 h-6 text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-extrabold tracking-tight flex items-center gap-2">
+                        NYT Pips <span class="text-xs bg-indigo-500 text-white font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider">Solver & Visualizer</span>
+                    </h1>
+                    <p class="text-xs text-slate-400 mt-0.5 font-medium">Extract, solve, and analyze New York Times "Pips" domino puzzles instantly</p>
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <button id="load-sample-btn" class="bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white transition-all duration-200 px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 border border-slate-700">
+                    <i data-lucide="play-circle" class="w-4 h-4"></i> Load Sample Game
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 py-6 md:py-8 grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- Left Sidebar: Input / Configuration -->
+        <section class="lg:col-span-4 flex flex-col gap-6">
+            <!-- Paste & Parse Box -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 flex flex-col gap-4">
+                <div class="flex items-center gap-2 pb-3 border-b border-slate-100">
+                    <i data-lucide="clipboard-paste" class="w-5 h-5 text-indigo-600"></i>
+                    <h2 class="text-lg font-bold text-slate-800">Paste Game Instance</h2>
+                </div>
+                
+                <p class="text-xs text-slate-500 leading-relaxed">
+                    Paste the raw HTML of the NYT Pips game container here (inspect the outer <code>GameMoment-module_gameContainer</code> element and copy the outer HTML).
+                </p>
+
+                <textarea id="html-input" 
+                    placeholder="<div class='GameMoment-module_gameContainer__Vuha8'>...</div>"
+                    class="w-full h-44 p-3 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all resize-none"
+                ></textarea>
+
+                <button id="parse-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-200 shadow-lg shadow-indigo-600/10 flex items-center justify-center gap-2">
+                    <i data-lucide="cpu" class="w-4 h-4"></i> Parse Game HTML
+                </button>
+            </div>
+
+            <!-- Game Stats / Rules Card -->
+            <div id="game-status-card" class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 hidden flex-col gap-4">
+                <div class="flex items-center gap-2 pb-3 border-b border-slate-100">
+                    <i data-lucide="info" class="w-5 h-5 text-slate-600"></i>
+                    <h2 class="text-lg font-bold text-slate-800">Game Properties</h2>
+                </div>
+                <div class="grid grid-cols-2 gap-3 text-sm">
+                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                        <span class="text-xs text-slate-400 block font-medium">Grid Size</span>
+                        <span id="stat-grid-size" class="text-base font-bold text-slate-700">-</span>
+                    </div>
+                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                        <span class="text-xs text-slate-400 block font-medium">Playable Cells</span>
+                        <span id="stat-playable-cells" class="text-base font-bold text-slate-700">-</span>
+                    </div>
+                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                        <span class="text-xs text-slate-400 block font-medium">Dominoes</span>
+                        <span id="stat-dominoes-count" class="text-base font-bold text-slate-700">-</span>
+                    </div>
+                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                        <span class="text-xs text-slate-400 block font-medium">Regions</span>
+                        <span id="stat-regions-count" class="text-base font-bold text-slate-700">-</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right / Main Panel: Visualization & Solving -->
+        <section class="lg:col-span-8 flex flex-col gap-6">
+            
+            <!-- Message / Instruction Banner -->
+            <div id="welcome-banner" class="bg-slate-100 border border-slate-200 rounded-2xl p-8 text-center flex flex-col items-center justify-center gap-4 py-16">
+                <div class="bg-indigo-50 text-indigo-600 p-4 rounded-full">
+                    <i data-lucide="sparkles" class="w-10 h-10"></i>
+                </div>
+                <h3 class="text-xl font-bold text-slate-800">Ready to Parse & Solve</h3>
+                <p class="text-sm text-slate-500 max-w-md">
+                    Paste your game HTML snippet in the sidebar, or click <strong>Load Sample Game</strong> above to explore the interactive board and its constraints immediately.
+                </p>
+            </div>
+
+            <!-- Main Interactive Workspace -->
+            <div id="workspace-card" class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 hidden flex-col gap-6">
+                
+                <!-- Workspace Header Controls -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                    <div>
+                        <h2 class="text-lg font-extrabold text-slate-800 flex items-center gap-2">
+                            Interactive Puzzle Canvas
+                        </h2>
+                        <p class="text-xs text-slate-500">Solve the current board or configure/inspect cells</p>
+                    </div>
+                    
+                    <div class="flex items-center gap-2">
+                        <!-- Solution Mode Toggle -->
+                        <div class="bg-slate-100 p-1 rounded-xl flex items-center border border-slate-200">
+                            <button id="view-original-btn" class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-all text-slate-600 bg-white shadow-sm" onclick="setViewState('original')">
+                                Original Board
+                            </button>
+                            <button id="view-solution-btn" class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-all text-slate-400 hover:text-slate-600" onclick="setViewState('solution')" disabled>
+                                Solution
+                            </button>
+                        </div>
+
+                        <!-- Solve Primary Action -->
+                        <button id="solve-btn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-xl text-sm transition-all duration-200 shadow-md shadow-emerald-600/10 flex items-center gap-2">
+                            <i data-lucide="check-circle" class="w-4 h-4"></i> Solve Puzzle
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Custom Notifications / Feedback Bar -->
+                <div id="notification-bar" class="hidden rounded-xl p-3 text-sm flex items-center gap-3 transition-all">
+                    <i id="notification-icon" class="w-5 h-5"></i>
+                    <span id="notification-text" class="font-medium"></span>
+                </div>
+
+                <!-- Game Presentation Workspace -->
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+                    
+                    <!-- Left Column: The Board Renderer -->
+                    <div class="md:col-span-8 flex flex-col items-center justify-center bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <div id="board-container" class="w-full flex justify-center overflow-auto">
+                            <!-- D3.js SVG Appended Here -->
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Tray & Solutions Navigator -->
+                    <div class="md:col-span-4 flex flex-col gap-4 w-full">
+                        
+                        <!-- Solutions Cycle Navigation -->
+                        <div id="solutions-navigator" class="bg-indigo-50/50 border border-indigo-100 rounded-xl p-4 hidden flex-col gap-3">
+                            <div class="text-xs text-indigo-700 font-semibold tracking-wider uppercase">Solutions Hub</div>
+                            <div class="flex items-center justify-between">
+                                <span id="solution-count-label" class="text-sm font-medium text-slate-700">1 of 1 Solutions</span>
+                                <div class="flex gap-1">
+                                    <button id="prev-sol-btn" class="p-1.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-700 transition" title="Previous solution">
+                                        <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                                    </button>
+                                    <button id="next-sol-btn" class="p-1.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-700 transition" title="Next solution">
+                                        <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tray Dominoes Representation -->
+                        <div class="bg-slate-50 rounded-xl p-4 border border-slate-100 flex flex-col gap-3">
+                            <div class="text-xs font-semibold text-slate-500 tracking-wider uppercase">Domino Tray</div>
+                            <div id="tray-container" class="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
+                                <!-- Tray Domino Cards Appended Here -->
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900 border-t border-slate-800 text-slate-400 py-6 px-6 mt-12">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4 text-xs">
+            <p>&copy; 2026 NYT Pips Solver. Built for parsing, rendering, and constraint-solving.</p>
+            <p class="flex items-center gap-1.5">
+                Powered by <span class="text-indigo-400 font-semibold">D3.js</span> & Backtracking Search
+            </p>
+        </div>
+    </footer>
+
+    <!-- CSS Injected Inline for D3 SVG Rendering aesthetics -->
+    <style>
+        .region-border {
+            stroke-width: 3px;
+            stroke-linecap: round;
+            fill: none;
+            stroke-dasharray: 6, 4;
+        }
+        .cell-border {
+            stroke: #cbd5e1;
+            stroke-width: 1px;
+            /* Note: removed fill rule from CSS class to avoid overriding D3 dynamic background pastels */
+        }
+        .domino-body {
+            stroke: #1e293b;
+            stroke-width: 2.5px;
+            fill: #fcfbf7;
+            rx: 12px;
+            ry: 12px;
+            filter: drop-shadow(0px 4px 6px rgba(15, 23, 42, 0.15));
+        }
+        .domino-line {
+            stroke: #1e293b;
+            stroke-width: 1.5px;
+            stroke-dasharray: 2, 2;
+        }
+        .pip-dot {
+            fill: #1e293b;
+        }
+    </style>
+
+    <script>
+        // --- CONSTANTS & CONFIGS ---
+        const CELL_SIZE = 80;
+        const CELL_PADDING = 8;
+        const GRID_MARGIN = 20;
+
+        // Visual Palette matching the stylish NYT Board Colors precisely
+        const COLOR_MAP = {
+            purple: { bg: '#ebd5fc', border: '#a855f7', text: '#6b21a8', badgeBg: '#a855f7' },
+            pink: { bg: '#fce7f3', border: '#ec4899', text: '#9d174d', badgeBg: '#ec4899' },
+            teal: { bg: '#ccfbf1', border: '#0d9488', text: '#115e59', badgeBg: '#0d9488' },
+            orange: { bg: '#ffedd5', border: '#f97316', text: '#9a3412', badgeBg: '#f97316' },
+            blue: { bg: '#dbeafe', border: '#1e40af', text: '#1e40af', badgeBg: '#113a82' },
+            green: { bg: '#e2ebd5', border: '#558b2f', text: '#274e13', badgeBg: '#558b2f' },
+            none: { bg: '#ebdcd0', border: '#c3b1a2', text: '#5c4d42', badgeBg: '#c3b1a2' }
+        };
+
+        // --- GLOBAL STATE ---
+        let gameState = {
+            rows: 5,
+            cols: 6,
+            visibleCells: [], // List of visible cell indices
+            regions: {},      // Grouped regions { color: { cells: [], target: "" } }
+            cellToRegion: {}, // Map cell index -> region object
+            dominoes: [],     // Parsed dominoes from Tray: { id, pips: [first, second] }
+            solutions: [],    // Calculated solutions
+            currentSolIndex: 0,
+            viewState: 'original' // 'original' or 'solution'
+        };
+
+        // --- SAMPLE GAME DATA (Matches Screenshot 2026-05-27 at 15.16.13.png) ---
+        const SAMPLE_HTML = `<div class="GameMoment-module_gameContainer__Vuha8"><div class="GameMoment-module_instructions__ZW7Et"><p data-testid="default-instructions">Place all the dominoes within the board to satisfy the conditions.</p></div><div class="Board-module_boardContainer__xtRPE undefined" style="--rows: 5; --cols: 6; --domino-border-radius: 10px; --domino-border-thickness: 2px; --pips-board-border-radius: 10px; --region-label-adjustment: 11px; --border-svg-blue: url(https://www.nytimes.com/games-assets/v2/4d72a44f05dced8a2a4a.svg); --border-svg-pink: url(https://www.nytimes.com/games-assets/v2/437e5a168f1f52d07d35.svg); --border-svg-orange: url(https://www.nytimes.com/games-assets/v2/44c961ccb3b27d5194e6.svg); --border-svg-teal: url(https://www.nytimes.com/games-assets/v2/617a2a60a56ab264fafb.svg); --border-svg-purple: url(https://www.nytimes.com/games-assets/v2/e23fbe4c0fbdc27614f4.svg); --border-svg-green: url(https://www.nytimes.com/games-assets/v2/d4e1fd2f7b92ffbac649.svg);"><div class="Board-module_backgroundWrapper__x5XOy" style="opacity: 1;"><section class="Board-module_background__q413m"><div class="Board-module_backgroundCell__R2Fku Board-module_roundedTopLeftCorner___MZ51" id="board-1"></div><div class="Board-module_backgroundCell__R2Fku" id="board-2"></div><div class="Board-module_backgroundCell__R2Fku" id="board-3"></div><div class="Board-module_backgroundCell__R2Fku" id="board-4"></div><div class="Board-module_backgroundCell__R2Fku" id="board-5"></div><div class="Board-module_backgroundCell__R2Fku Board-module_roundedTopRightCorner__Vxedu" id="board-6"></div><div class="Board-module_backgroundCell__R2Fku" id="board-7"></div><div class="Board-module_backgroundCell__R2Fku" id="board-8"></div><div class="Board-module_backgroundCell__R2Fku" id="board-9"></div><div class="Board-module_backgroundCell__R2Fku" id="board-10"></div><div class="Board-module_backgroundCell__R2Fku" id="board-11"></div><div class="Board-module_backgroundCell__R2Fku" id="board-12"></div><div class="Board-module_backgroundCell__R2Fku" id="board-13"></div><div class="Board-module_backgroundCell__R2Fku" id="board-14"></div><div class="Board-module_backgroundCell__R2Fku" id="board-15"></div><div class="Board-module_backgroundCell__R2Fku" id="board-16"></div><div class="Board-module_backgroundCell__R2Fku" id="board-17"></div><div class="Board-module_backgroundCell__R2Fku" id="board-18"></div><div class="Board-module_backgroundCell__R2Fku" id="board-19"></div><div class="Board-module_backgroundCell__R2Fku" id="board-20"></div><div class="Board-module_backgroundCell__R2Fku" id="board-21"></div><div class="Board-module_backgroundCell__R2Fku" id="board-22"></div><div class="Board-module_backgroundCell__R2Fku" id="board-23"></div><div class="Board-module_backgroundCell__R2Fku" id="board-24"></div><div class="Board-module_backgroundCell__R2Fku Board-module_roundedBottomLeftCorner__AxAfV" id="board-25"></div><div class="Board-module_backgroundCell__R2Fku" id="board-26"></div><div class="Board-module_backgroundCell__R2Fku" id="board-27"></div><div class="Board-module_backgroundCell__R2Fku" id="board-28"></div><div class="Board-module_backgroundCell__R2Fku" id="board-29"></div><div class="Board-module_backgroundCell__R2Fku Board-module_roundedBottomRightCorner__eDiRB" id="board-30"></div></section><div class="Board-module_droppableWrapper__gEcg2" data-testid="pips-board"><section class="Board-module_droppable__bdR2Y"><div class="Board-module_droppableCell__ndah2"></div><div class="Board-module_droppableCell__ndah2"></div><div class="Board-module_droppableCell__ndah2"></div><div class="Board-module_droppableCell__ndah2"></div><div class="Board-module_droppableCell__ndah2"></div><div class="Board-module_droppableCell__ndah2"></div><div class="Board-module_droppableCell__ndah2"></div><div class="Board-module_droppableCell__ndah2"></div><div class="Board-module_droppableCell__ndah2"></div><div class="Board-module_droppableCell__ndah2"></div><div class="Board-module_droppableCell__ndah2"></div><div class="Board-module_droppableCell__ndah2"></div><div class="Board-module_droppableCell__ndah2"></div><div class="Board-module_droppableCell__ndah2"></div><div class="Board-module_droppableCell__ndah2"></div><div class="Board-module_droppableCell__ndah2"></div><div class="Board-module_droppableCell__ndah2"></div><div class="Board-module_droppableCell__ndah2"></div><div class="Board-module_droppableCell__ndah2"></div><div class="Board-module_droppableCell__ndah2"></div><div class="Board-module_droppableCell__ndah2"></div><div class="Board-module_droppableCell__ndah2"></div><div class="Board-module_droppableCell__ndah2"></div><div class="Board-module_droppableCell__ndah2"></div><div class="Board-module_droppableCell__ndah2"></div><div class="Board-module_droppableCell__ndah2"></div><div class="Board-module_droppableCell__ndah2"></div><div class="Board-module_droppableCell__ndah2"></div><div class="Board-module_droppableCell__ndah2"></div><div class="Board-module_droppableCell__ndah2"></div></section></div><div class="Board-module_regionWrapper__PUrra"><section class="Board-module_regions__tziM1"><div class="RegionCell-module_regionCell__tCLmz"><div class="RegionCell-module_regionCellInner__J6lhQ RegionCell-module_purple__Fb0PL RegionCell-module_moveBordersInset__WJ4QE RegionCell-module_borderImagesLoaded__y5zWc" style="--pips-region-border-thickness: 16px;"></div><span class="RegionCell-module_regionLabel__Pci0h RegionCell-module_purple__Fb0PL"><span class="RegionCell-module_regionLabelText__KiEjj" style="font-size: calc(15.25px);">4</span></span></div><div class="RegionCell-module_regionCell__tCLmz"><div class="RegionCell-module_regionCellInner__J6lhQ RegionCell-module_pink__DkG7y RegionCell-module_moveBordersInset__WJ4QE RegionCell-module_borderImagesLoaded__y5zWc" style="--pips-region-border-thickness: 16px;"></div><span class="RegionCell-module_regionLabel__Pci0h RegionCell-module_pink__DkG7y"><span class="RegionCell-module_regionLabelText__KiEjj" style="font-size: calc(15.25px);">4</span></span></div><div class="RegionCell-module_regionCell__tCLmz"><div class="RegionCell-module_regionCellInner__J6lhQ RegionCell-module_teal__NteUj RegionCell-module_moveBordersInset__WJ4QE RegionCell-module_borderImagesLoaded__y5zWc" style="--pips-region-border-thickness: 16px;"></div><span class="RegionCell-module_regionLabel__Pci0h RegionCell-module_teal__NteUj"><span class="RegionCell-module_regionLabelText__KiEjj" style="font-size: calc(15.25px);">3</span></span></div><div class="RegionCell-module_regionCell__tCLmz"><div class="RegionCell-module_regionCellInner__J6lhQ RegionCell-module_orange__c58SX RegionCell-module_moveBordersInset__WJ4QE RegionCell-module_borderImagesLoaded__y5zWc" style="--pips-region-border-thickness: 16px;"></div><span class="RegionCell-module_regionLabel__Pci0h RegionCell-module_orange__c58SX"><span class="RegionCell-module_regionLabelText__KiEjj" style="font-size: calc(15.25px);">4</span></span></div><div class="RegionCell-module_regionCell__tCLmz"><div class="RegionCell-module_regionCellInner__J6lhQ RegionCell-module_blue__T1SRo RegionCell-module_moveBordersInset__WJ4QE RegionCell-module_borderImagesLoaded__y5zWc" style="--pips-region-border-thickness: 16px;"></div><span class="RegionCell-module_regionLabel__Pci0h RegionCell-module_blue__T1SRo"><span class="RegionCell-module_regionLabelText__KiEjj" style="font-size: calc(15.25px);">3</span></span></div><div class="RegionCell-module_regionCell__tCLmz"><div class="RegionCell-module_regionCellInner__J6lhQ RegionCell-module_green__mM6SG RegionCell-module_moveBordersInset__WJ4QE RegionCell-module_borderImagesLoaded__y5zWc" style="--pips-region-border-thickness: 16px;"></div><span class="RegionCell-module_regionLabel__Pci0h RegionCell-module_green__mM6SG"><span class="RegionCell-module_regionLabelText__KiEjj" style="font-size: calc(15.25px);">3</span></span></div><div class="RegionCell-module_regionCell__tCLmz"><div class="RegionCell-module_regionCellInner__J6lhQ RegionCell-module_pink__DkG7y RegionCell-module_moveBordersInset__WJ4QE RegionCell-module_borderImagesLoaded__y5zWc" style="--pips-region-border-thickness: 16px;"></div><span class="RegionCell-module_regionLabel__Pci0h RegionCell-module_pink__DkG7y"><span class="RegionCell-module_regionLabelText__KiEjj" style="font-size: calc(15.25px);">1</span></span></div><div class="RegionCell-module_regionCell__tCLmz"><div class="RegionCell-module_regionCellInner__J6lhQ RegionCell-module_teal__NteUj RegionCell-module_moveBordersInset__WJ4QE RegionCell-module_borderImagesLoaded__y5zWc" style="--pips-region-border-thickness: 16px;"></div><span class="RegionCell-module_regionLabel__Pci0h RegionCell-module_teal__NteUj"><span class="RegionCell-module_regionLabelText__KiEjj" style="font-size: calc(15.25px);">5</span></span></div><div class="RegionCell-module_regionCell__tCLmz"><div class="RegionCell-module_regionCellInner__J6lhQ RegionCell-module_orange__c58SX RegionCell-module_moveBordersInset__WJ4QE RegionCell-module_borderImagesLoaded__y5zWc" style="--pips-region-border-thickness: 16px;"></div><span class="RegionCell-module_regionLabel__Pci0h RegionCell-module_orange__c58SX"><span class="RegionCell-module_regionLabelText__KiEjj" style="font-size: calc(15.25px);">0</span></span></div><div class="RegionCell-module_regionCell__tCLmz"><div class="RegionCell-module_regionCellInner__J6lhQ RegionCell-module_blue__T1SRo RegionCell-module_moveBordersInset__WJ4QE RegionCell-module_borderImagesLoaded__y5zWc" style="--pips-region-border-thickness: 16px;"></div><span class="RegionCell-module_regionLabel__Pci0h RegionCell-module_blue__T1SRo"><span class="RegionCell-module_regionLabelText__KiEjj" style="font-size: calc(15.25px);">2</span></span></div><div class="RegionCell-module_regionCell__tCLmz"><div class="RegionCell-module_regionCellInner__J6lhQ RegionCell-module_green__mM6SG RegionCell-module_moveBordersInset__WJ4QE RegionCell-module_borderImagesLoaded__y5zWc" style="--pips-region-border-thickness: 16px;"></div><span class="RegionCell-module_regionLabel__Pci0h RegionCell-module_green__mM6SG"><span class="RegionCell-module_regionLabelText__KiEjj" style="font-size: calc(15.25px);">6</span></span></div><div class="RegionCell-module_regionCell__tCLmz"><div class="RegionCell-module_regionCellInner__J6lhQ RegionCell-module_purple__Fb0PL RegionCell-module_moveBordersInset__WJ4QE RegionCell-module_borderImagesLoaded__y5zWc" style="--pips-region-border-thickness: 16px;"></div><span class="RegionCell-module_regionLabel__Pci0h RegionCell-module_purple__Fb0PL"><span class="RegionCell-module_regionLabelText__KiEjj" style="font-size: calc(15.25px);">3</span></span></div><div class="RegionCell-module_regionCell__tCLmz"><div class="RegionCell-module_regionCellInner__J6lhQ RegionCell-module_teal__NteUj RegionCell-module_moveBordersInset__WJ4QE RegionCell-module_borderImagesLoaded__y5zWc" style="--pips-region-border-thickness: 16px;"></div><span class="RegionCell-module_regionLabel__Pci0h RegionCell-module_teal__NteUj"><span class="RegionCell-module_regionLabelText__KiEjj" style="font-size: calc(15.25px);">2</span></span></div><div class="RegionCell-module_regionCell__tCLmz"><div class="RegionCell-module_regionCellInner__J6lhQ RegionCell-module_orange__c58SX RegionCell-module_moveBordersInset__WJ4QE RegionCell-module_borderImagesLoaded__y5zWc" style="--pips-region-border-thickness: 16px;"></div><span class="RegionCell-module_regionLabel__Pci0h RegionCell-module_orange__c58SX"><span class="RegionCell-module_regionLabelText__KiEjj" style="font-size: calc(15.25px);">2</span></span></div><div class="RegionCell-module_regionCell__tCLmz"><div class="RegionCell-module_regionCellInner__J6lhQ RegionCell-module_blue__T1SRo RegionCell-module_moveBordersInset__WJ4QE RegionCell-module_borderImagesLoaded__y5zWc" style="--pips-region-border-thickness: 16px;"></div><span class="RegionCell-module_regionLabel__Pci0h RegionCell-module_blue__T1SRo"><span class="RegionCell-module_regionLabelText__KiEjj" style="font-size: calc(15.25px);">3</span></span></div><div class="RegionCell-module_regionCell__tCLmz"><div class="RegionCell-module_regionCellInner__J6lhQ RegionCell-module_green__mM6SG RegionCell-module_moveBordersInset__WJ4QE RegionCell-module_borderImagesLoaded__y5zWc" style="--pips-region-border-thickness: 16px;"></div><span class="RegionCell-module_regionLabel__Pci0h RegionCell-module_green__mM6SG"><span class="RegionCell-module_regionLabelText__KiEjj" style="font-size: calc(15.25px);">4</span></span></div><div class="RegionCell-module_regionCell__tCLmz"><div class="RegionCell-module_regionCellInner__J6lhQ RegionCell-module_purple__Fb0PL RegionCell-module_moveBordersInset__WJ4QE RegionCell-module_borderImagesLoaded__y5zWc" style="--pips-region-border-thickness: 16px;"></div><span class="RegionCell-module_regionLabel__Pci0h RegionCell-module_purple__Fb0PL"><span class="RegionCell-module_regionLabelText__KiEjj" style="font-size: calc(15.25px);">4</span></span></div><div class="RegionCell-module_regionCell__tCLmz"><div class="RegionCell-module_regionCellInner__J6lhQ RegionCell-module_pink__DkG7y RegionCell-module_moveBordersInset__WJ4QE RegionCell-module_borderImagesLoaded__y5zWc" style="--pips-region-border-thickness: 16px;"></div><span class="RegionCell-module_regionLabel__Pci0h RegionCell-module_pink__DkG7y"><span class="RegionCell-module_regionLabelText__KiEjj" style="font-size: calc(15.25px);">1</span></span></div><div class="RegionCell-module_regionCell__tCLmz"><div class="RegionCell-module_regionCellInner__J6lhQ RegionCell-module_orange__c58SX RegionCell-module_moveBordersInset__WJ4QE RegionCell-module_borderImagesLoaded__y5zWc" style="--pips-region-border-thickness: 16px;"></div><span class="RegionCell-module_regionLabel__Pci0h RegionCell-module_orange__c58SX"><span class="RegionCell-module_regionLabelText__KiEjj" style="font-size: calc(15.25px);">5</span></span></div><div class="RegionCell-module_regionCell__tCLmz"><div class="RegionCell-module_regionCellInner__J6lhQ RegionCell-module_blue__T1SRo RegionCell-module_moveBordersInset__WJ4QE RegionCell-module_borderImagesLoaded__y5zWc" style="--pips-region-border-thickness: 16px;"></div><span class="RegionCell-module_regionLabel__Pci0h RegionCell-module_blue__T1SRo"><span class="RegionCell-module_regionLabelText__KiEjj" style="font-size: calc(15.25px);">2</span></span></div><div class="RegionCell-module_regionCell__tCLmz"><div class="RegionCell-module_regionCellInner__J6lhQ RegionCell-module_green__mM6SG RegionCell-module_moveBordersInset__WJ4QE RegionCell-module_borderImagesLoaded__y5zWc" style="--pips-region-border-thickness: 16px;"></div><span class="RegionCell-module_regionLabel__Pci0h RegionCell-module_green__mM6SG"><span class="RegionCell-module_regionLabelText__KiEjj" style="font-size: calc(15.25px);">1</span></span></div><div class="RegionCell-module_regionCell__tCLmz"><div class="RegionCell-module_regionCellInner__J6lhQ RegionCell-module_purple__Fb0PL RegionCell-module_moveBordersInset__WJ4QE RegionCell-module_borderImagesLoaded__y5zWc" style="--pips-region-border-thickness: 16px;"></div><span class="RegionCell-module_regionLabel__Pci0h RegionCell-module_purple__Fb0PL"><span class="RegionCell-module_regionLabelText__KiEjj" style="font-size: calc(15.25px);">4</span></span></div><div class="RegionCell-module_regionCell__tCLmz"><div class="RegionCell-module_regionCellInner__J6lhQ RegionCell-module_pink__DkG7y RegionCell-module_moveBordersInset__WJ4QE RegionCell-module_borderImagesLoaded__y5zWc" style="--pips-region-border-thickness: 16px;"></div><span class="RegionCell-module_regionLabel__Pci0h RegionCell-module_pink__DkG7y"><span class="RegionCell-module_regionLabelText__KiEjj" style="font-size: calc(15.25px);">6</span></span></div><div class="RegionCell-module_regionCell__tCLmz RegionCell-module_hidden__lIx6x"></div><div class="RegionCell-module_regionCell__tCLmz RegionCell-module_hidden__lIx6x"></div><div class="RegionCell-module_regionCell__tCLmz"><div class="RegionCell-module_regionCellInner__J6lhQ RegionCell-module_teal__NteUj RegionCell-module_moveBordersInset__WJ4QE RegionCell-module_borderImagesLoaded__y5zWc" style="--pips-region-border-thickness: 16px;"></div><span class="RegionCell-module_regionLabel__Pci0h RegionCell-module_teal__NteUj"><span class="RegionCell-module_regionLabelText__KiEjj" style="font-size: calc(15.25px);">0</span></span></div><div class="RegionCell-module_regionCell__tCLmz"><div class="RegionCell-module_regionCellInner__J6lhQ RegionCell-module_orange__c58SX RegionCell-module_moveBordersInset__WJ4QE RegionCell-module_borderImagesLoaded__y5zWc" style="--pips-region-border-thickness: 16px;"></div><span class="RegionCell-module_regionLabel__Pci0h RegionCell-module_orange__c58SX"><span class="RegionCell-module_regionLabelText__KiEjj" style="font-size: calc(15.25px);">1</span></span></div><div class="RegionCell-module_regionCell__tCLmz"><div class="RegionCell-module_regionCellInner__J6lhQ RegionCell-module_blue__T1SRo RegionCell-module_moveBordersInset__WJ4QE RegionCell-module_borderImagesLoaded__y5zWc" style="--pips-region-border-thickness: 16px;"></div><span class="RegionCell-module_regionLabel__Pci0h RegionCell-module_blue__T1SRo"><span class="RegionCell-module_regionLabelText__KiEjj" style="font-size: calc(15.25px);">0</span></span></div><div class="RegionCell-module_regionCell__tCLmz"><div class="RegionCell-module_regionCellInner__J6lhQ RegionCell-module_green__mM6SG RegionCell-module_moveBordersInset__WJ4QE RegionCell-module_borderImagesLoaded__y5zWc" style="--pips-region-border-thickness: 16px;"></div><span class="RegionCell-module_regionLabel__Pci0h RegionCell-module_green__mM6SG"><span class="RegionCell-module_regionLabelText__KiEjj" style="font-size: calc(15.25px);">3</span></span></div><div class="RegionCell-module_regionCell__tCLmz RegionCell-module_hidden__lIx6x"></div></section></div><div class="Board-module_hoverWrapper__LCepo"><section class="Board-module_hover__fXtec"><div class="Board-module_hoverCell__MJ4fr"></div><div class="Board-module_hoverCell__MJ4fr"></div><div class="Board-module_hoverCell__MJ4fr"></div><div class="Board-module_hoverCell__MJ4fr"></div><div class="Board-module_hoverCell__MJ4fr"></div><div class="Board-module_hoverCell__MJ4fr"></div><div class="Board-module_hoverCell__MJ4fr"></div><div class="Board-module_hoverCell__MJ4fr"></div><div class="Board-module_hoverCell__MJ4fr"></div><div class="Board-module_hoverCell__MJ4fr"></div><div class="Board-module_hoverCell__MJ4fr"></div><div class="Board-module_hoverCell__MJ4fr"></div><div class="Board-module_hoverCell__MJ4fr"></div><div class="Board-module_hoverCell__MJ4fr"></div><div class="Board-module_hoverCell__MJ4fr"></div><div class="Board-module_hoverCell__MJ4fr"></div><div class="Board-module_hoverCell__MJ4fr"></div><div class="Board-module_hoverCell__MJ4fr"></div><div class="Board-module_hoverCell__MJ4fr"></div><div class="Board-module_hoverCell__MJ4fr"></div><div class="Board-module_hoverCell__MJ4fr"></div><div class="Board-module_hoverCell__MJ4fr"></div><div class="Board-module_hoverCell__MJ4fr"></div><div class="Board-module_hoverCell__MJ4fr"></div><div class="Board-module_hoverCell__MJ4fr"></div><div class="Board-module_hoverCell__MJ4fr"></div><div class="Board-module_hoverCell__MJ4fr"></div><div class="Board-module_hoverCell__MJ4fr"></div><div class="Board-module_hoverCell__MJ4fr"></div><div class="Board-module_hoverCell__MJ4fr"></div></section></div></div></div><div class="Tray-module_trayContainer__zSWYr" style="--tray-padding: 20px;"><div class="Tray-module_tray__D0g2K" style="--tray-width: 400px; --tray-height: 165px;"><div class="Tray-module_trayDominoWrapper__HxjLu" style="width: 70px; height: 35px; --domino-border-radius: 5.95px; --domino-border-thickness: 1.505px;"><div class="Tray-module_emptyTraySlot__KQ6Lo"></div><div class="Domino-module_domino__hSfP4" style="transform: rotate(0deg); box-shadow: unset;"><button id="domino-1-first" class="Domino-module_halfDomino__FWnOS Domino-module_isFirst__qiM7f" role="button" tabindex="0" aria-disabled="false" aria-roledescription="draggable" aria-describedby="DndDescribedBy-0" style="box-shadow: rgb(173, 173, 173) 0px -2.2704px inset; transition: box-shadow 400ms;"><div class="Domino-module_dotsWrapper__kkdAC"><span class="Domino-module_dot__z3BLH Domino-module_middle__0bq7B"></span><span class="Domino-module_dot__z3BLH Domino-module_topRight__ALElk"></span><span class="Domino-module_dot__z3BLH Domino-module_topLeft__MOH8P"></span><span class="Domino-module_dot__z3BLH Domino-module_bottomLeft__W5oeb"></span><span class="Domino-module_dot__z3BLH Domino-module_bottomRight__XsqaY"></span></div></button><button id="domino-1-second" class="Domino-module_halfDomino__FWnOS" role="button" tabindex="0" aria-disabled="false" aria-roledescription="draggable" aria-describedby="DndDescribedBy-0" style="box-shadow: rgb(173, 173, 173) 0px -2.2704px inset; transition: box-shadow 400ms;"><div class="Domino-module_dotsWrapper__kkdAC"><span class="Domino-module_dot__z3BLH Domino-module_topLeft__MOH8P"></span><span class="Domino-module_dot__z3BLH Domino-module_middle__0bq7B"></span><span class="Domino-module_dot__z3BLH Domino-module_bottomRight__XsqaY"></span></div></button></div></div><div class="Tray-module_trayDominoWrapper__HxjLu" style="width: 70px; height: 35px; --domino-border-radius: 5.95px; --domino-border-thickness: 1.505px;"><div class="Tray-module_emptyTraySlot__KQ6Lo"></div><div class="Domino-module_domino__hSfP4" style="transform: rotate(0deg); box-shadow: unset;"><button id="domino-2-first" class="Domino-module_halfDomino__FWnOS Domino-module_isFirst__qiM7f" role="button" tabindex="0" aria-disabled="false" aria-roledescription="draggable" aria-describedby="DndDescribedBy-0" style="box-shadow: rgb(173, 173, 173) 0px -2.2704px inset; transition: box-shadow 400ms;"><div class="Domino-module_dotsWrapper__kkdAC"><span class="Domino-module_dot__z3BLH Domino-module_topLeft__MOH8P"></span><span class="Domino-module_dot__z3BLH Domino-module_middle__0bq7B"></span><span class="Domino-module_dot__z3BLH Domino-module_bottomRight__XsqaY"></span></div></button><button id="domino-2-second" class="Domino-module_halfDomino__FWnOS" role="button" tabindex="0" aria-disabled="false" aria-roledescription="draggable" aria-describedby="DndDescribedBy-0" style="box-shadow: rgb(173, 173, 173) 0px -2.2704px inset; transition: box-shadow 400ms;"><div class="Domino-module_dotsWrapper__kkdAC"><span class="Domino-module_dot__z3BLH Domino-module_topRight__ALElk"></span><span class="Domino-module_dot__z3BLH Domino-module_topLeft__MOH8P"></span><span class="Domino-module_dot__z3BLH Domino-module_bottomLeft__W5oeb"></span><span class="Domino-module_dot__z3BLH Domino-module_bottomRight__XsqaY"></span></div></button></div></div><div class="Tray-module_trayDominoWrapper__HxjLu" style="width: 70px; height: 35px; --domino-border-radius: 5.95px; --domino-border-thickness: 1.505px;"><div class="Tray-module_emptyTraySlot__KQ6Lo"></div><div class="Domino-module_domino__hSfP4" style="transform: rotate(0deg); box-shadow: unset;"><button id="domino-3-first" class="Domino-module_halfDomino__FWnOS Domino-module_isFirst__qiM7f" role="button" tabindex="0" aria-disabled="false" aria-roledescription="draggable" aria-describedby="DndDescribedBy-0" style="box-shadow: rgb(173, 173, 173) 0px -2.2704px inset; transition: box-shadow 400ms;"><div class="Domino-module_dotsWrapper__kkdAC"><span class="Domino-module_dot__z3BLH Domino-module_middle__0bq7B"></span></div></button><button id="domino-3-second" class="Domino-module_halfDomino__FWnOS" role="button" tabindex="0" aria-disabled="false" aria-roledescription="draggable" aria-describedby="DndDescribedBy-0" style="box-shadow: rgb(173, 173, 173) 0px -2.2704px inset; transition: box-shadow 400ms;"><div class="Domino-module_dotsWrapper__kkdAC"><span class="Domino-module_dot__z3BLH Domino-module_topLeft__MOH8P"></span><span class="Domino-module_dot__z3BLH Domino-module_bottomRight__XsqaY"></span></div></button></div></div><div class="Tray-module_trayDominoWrapper__HxjLu" style="width: 70px; height: 35px; --domino-border-radius: 5.95px; --domino-border-thickness: 1.505px;"><div class="Tray-module_emptyTraySlot__KQ6Lo"></div><div class="Domino-module_domino__hSfP4" style="transform: rotate(0deg); box-shadow: unset;"><button id="domino-4-first" class="Domino-module_halfDomino__FWnOS Domino-module_isFirst__qiM7f" role="button" tabindex="0" aria-disabled="false" aria-roledescription="draggable" aria-describedby="DndDescribedBy-0" style="box-shadow: rgb(173, 173, 173) 0px -2.2704px inset; transition: box-shadow 400ms;"><div class="Domino-module_dotsWrapper__kkdAC"></div></button><button id="domino-4-second" class="Domino-module_halfDomino__FWnOS" role="button" tabindex="0" aria-disabled="false" aria-roledescription="draggable" aria-describedby="DndDescribedBy-0" style="box-shadow: rgb(173, 173, 173) 0px -2.2704px inset; transition: box-shadow 400ms;"><div class="Domino-module_dotsWrapper__kkdAC"><span class="Domino-module_dot__z3BLH Domino-module_middle__0bq7B"></span><span class="Domino-module_dot__z3BLH Domino-module_topRight__ALElk"></span><span class="Domino-module_dot__z3BLH Domino-module_topLeft__MOH8P"></span><span class="Domino-module_dot__z3BLH Domino-module_bottomLeft__W5oeb"></span><span class="Domino-module_dot__z3BLH Domino-module_bottomRight__XsqaY"></span></div></button></div></div><div class="Tray-module_trayDominoWrapper__HxjLu" style="width: 70px; height: 35px; --domino-border-radius: 5.95px; --domino-border-thickness: 1.505px;"><div class="Tray-module_emptyTraySlot__KQ6Lo"></div><div class="Domino-module_domino__hSfP4" style="transform: rotate(0deg); box-shadow: unset;"><button id="domino-5-first" class="Domino-module_halfDomino__FWnOS Domino-module_isFirst__qiM7f" role="button" tabindex="0" aria-disabled="false" aria-roledescription="draggable" aria-describedby="DndDescribedBy-0" style="box-shadow: rgb(173, 173, 173) 0px -2.2704px inset; transition: box-shadow 400ms;"><div class="Domino-module_dotsWrapper__kkdAC"><span class="Domino-module_dot__z3BLH Domino-module_topLeft__MOH8P"></span><span class="Domino-module_dot__z3BLH Domino-module_middle__0bq7B"></span><span class="Domino-module_dot__z3BLH Domino-module_bottomRight__XsqaY"></span></div></button><button id="domino-5-second" class="Domino-module_halfDomino__FWnOS" role="button" tabindex="0" aria-disabled="false" aria-roledescription="draggable" aria-describedby="DndDescribedBy-0" style="box-shadow: rgb(173, 173, 173) 0px -2.2704px inset; transition: box-shadow 400ms;"><div class="Domino-module_dotsWrapper__kkdAC"><span class="Domino-module_dot__z3BLH Domino-module_topLeft__MOH8P"></span><span class="Domino-module_dot__z3BLH Domino-module_bottomRight__XsqaY"></span></div></button></div></div><div class="Tray-module_trayDominoWrapper__HxjLu" style="width: 70px; height: 35px; --domino-border-radius: 5.95px; --domino-border-thickness: 1.505px;"><div class="Tray-module_emptyTraySlot__KQ6Lo"></div><div class="Domino-module_domino__hSfP4" style="transform: rotate(0deg); box-shadow: unset;"><button id="domino-6-first" class="Domino-module_halfDomino__FWnOS Domino-module_isFirst__qiM7f" role="button" tabindex="0" aria-disabled="false" aria-roledescription="draggable" aria-describedby="DndDescribedBy-0" style="box-shadow: rgb(173, 173, 173) 0px -2.2704px inset; transition: box-shadow 400ms;"><div class="Domino-module_dotsWrapper__kkdAC"><span class="Domino-module_dot__z3BLH Domino-module_middle__0bq7B"></span><span class="Domino-module_dot__z3BLH Domino-module_topRight__ALElk"></span><span class="Domino-module_dot__z3BLH Domino-module_topLeft__MOH8P"></span><span class="Domino-module_dot__z3BLH Domino-module_bottomLeft__W5oeb"></span><span class="Domino-module_dot__z3BLH Domino-module_bottomRight__XsqaY"></span></div></button><button id="domino-6-second" class="Domino-module_halfDomino__FWnOS" role="button" tabindex="0" aria-disabled="false" aria-roledescription="draggable" aria-describedby="DndDescribedBy-0" style="box-shadow: rgb(173, 173, 173) 0px -2.2704px inset; transition: box-shadow 400ms;"><div class="Domino-module_dotsWrapper__kkdAC"><span class="Domino-module_dot__z3BLH Domino-module_topRight__ALElk"></span><span class="Domino-module_dot__z3BLH Domino-module_topLeft__MOH8P"></span><span class="Domino-module_dot__z3BLH Domino-module_bottomLeft__W5oeb"></span><span class="Domino-module_dot__z3BLH Domino-module_bottomRight__XsqaY"></span></div></button></div></div><div class="Tray-module_trayDominoWrapper__HxjLu" style="width: 70px; height: 35px; --domino-border-radius: 5.95px; --domino-border-thickness: 1.505px;"><div class="Tray-module_emptyTraySlot__KQ6Lo"></div><div class="Domino-module_domino__hSfP4" style="transform: rotate(0deg); box-shadow: unset;"><button id="domino-7-first" class="Domino-module_halfDomino__FWnOS Domino-module_isFirst__qiM7f" role="button" tabindex="0" aria-disabled="false" aria-roledescription="draggable" aria-describedby="DndDescribedBy-0" style="box-shadow: rgb(173, 173, 173) 0px -2.2704px inset; transition: box-shadow 400ms;"><div class="Domino-module_dotsWrapper__kkdAC"><span class="Domino-module_dot__z3BLH Domino-module_topRight__ALElk"></span><span class="Domino-module_dot__z3BLH Domino-module_topLeft__MOH8P"></span><span class="Domino-module_dot__z3BLH Domino-module_bottomLeft__W5oeb"></span><span class="Domino-module_dot__z3BLH Domino-module_bottomRight__XsqaY"></span></div></button><button id="domino-7-second" class="Domino-module_halfDomino__FWnOS" role="button" tabindex="0" aria-disabled="false" aria-roledescription="draggable" aria-describedby="DndDescribedBy-0" style="box-shadow: rgb(173, 173, 173) 0px -2.2704px inset; transition: box-shadow 400ms;"><div class="Domino-module_dotsWrapper__kkdAC"><span class="Domino-module_dot__z3BLH Domino-module_middle__0bq7B"></span></div></button></div></div><div class="Tray-module_trayDominoWrapper__HxjLu" style="width: 70px; height: 35px; --domino-border-radius: 5.95px; --domino-border-thickness: 1.505px;"><div class="Tray-module_emptyTraySlot__KQ6Lo"></div><div class="Domino-module_domino__hSfP4" style="transform: rotate(0deg); box-shadow: unset;"><button id="domino-8-first" class="Domino-module_halfDomino__FWnOS Domino-module_isFirst__qiM7f" role="button" tabindex="0" aria-disabled="false" aria-roledescription="draggable" aria-describedby="DndDescribedBy-0" style="box-shadow: rgb(173, 173, 173) 0px -2.2704px inset; transition: box-shadow 400ms;"><div class="Domino-module_dotsWrapper__kkdAC"><span class="Domino-module_dot__z3BLH Domino-module_topLeft__MOH8P"></span><span class="Domino-module_dot__z3BLH Domino-module_bottomRight__XsqaY"></span></div></button><button id="domino-8-second" class="Domino-module_halfDomino__FWnOS" role="button" tabindex="0" aria-disabled="false" aria-roledescription="draggable" aria-describedby="DndDescribedBy-0" style="box-shadow: rgb(173, 173, 173) 0px -2.2704px inset; transition: box-shadow 400ms;"><div class="Domino-module_dotsWrapper__kkdAC"><span class="Domino-module_dot__z3BLH Domino-module_topRight__ALElk"></span><span class="Domino-module_dot__z3BLH Domino-module_topLeft__MOH8P"></span><span class="Domino-module_dot__z3BLH Domino-module_bottomLeft__W5oeb"></span><span class="Domino-module_dot__z3BLH Domino-module_bottomRight__XsqaY"></span><span class="Domino-module_dot__z3BLH Domino-module_middleLeft__w5HnM"></span><span class="Domino-module_dot__z3BLH Domino-module_middleRight__aO70z"></span></div></button></div></div><div class="Tray-module_trayDominoWrapper__HxjLu" style="width: 70px; height: 35px; --domino-border-radius: 5.95px; --domino-border-thickness: 1.505px;"><div class="Tray-module_emptyTraySlot__KQ6Lo"></div><div class="Domino-module_domino__hSfP4" style="transform: rotate(0deg); box-shadow: unset;"><button id="domino-9-first" class="Domino-module_halfDomino__FWnOS Domino-module_isFirst__qiM7f" role="button" tabindex="0" aria-disabled="false" aria-roledescription="draggable" aria-describedby="DndDescribedBy-0" style="box-shadow: rgb(173, 173, 173) 0px -2.2704px inset; transition: box-shadow 400ms;"><div class="Domino-module_dotsWrapper__kkdAC"><span class="Domino-module_dot__z3BLH Domino-module_topRight__ALElk"></span><span class="Domino-module_dot__z3BLH Domino-module_topLeft__MOH8P"></span><span class="Domino-module_dot__z3BLH Domino-module_bottomLeft__W5oeb"></span><span class="Domino-module_dot__z3BLH Domino-module_bottomRight__XsqaY"></span></div></button><button id="domino-9-second" class="Domino-module_halfDomino__FWnOS" role="button" tabindex="0" aria-disabled="false" aria-roledescription="draggable" aria-describedby="DndDescribedBy-0" style="box-shadow: rgb(173, 173, 173) 0px -2.2704px inset; transition: box-shadow 400ms;"><div class="Domino-module_dotsWrapper__kkdAC"><span class="Domino-module_dot__z3BLH Domino-module_topRight__ALElk"></span><span class="Domino-module_dot__z3BLH Domino-module_topLeft__MOH8P"></span><span class="Domino-module_dot__z3BLH Domino-module_bottomLeft__W5oeb"></span><span class="Domino-module_dot__z3BLH Domino-module_bottomRight__XsqaY"></span></div></button></div></div><div class="Tray-module_trayDominoWrapper__HxjLu" style="width: 70px; height: 35px; --domino-border-radius: 5.95px; --domino-border-thickness: 1.505px;"><div class="Tray-module_emptyTraySlot__KQ6Lo"></div><div class="Domino-module_domino__hSfP4" style="transform: rotate(0deg); box-shadow: unset;"><button id="domino-10-first" class="Domino-module_halfDomino__FWnOS Domino-module_isFirst__qiM7f" role="button" tabindex="0" aria-disabled="false" aria-roledescription="draggable" aria-describedby="DndDescribedBy-0" style="box-shadow: rgb(173, 173, 173) 0px -2.2704px inset; transition: box-shadow 400ms;"><div class="Domino-module_dotsWrapper__kkdAC"><span class="Domino-module_dot__z3BLH Domino-module_topLeft__MOH8P"></span><span class="Domino-module_dot__z3BLH Domino-module_middle__0bq7B"></span><span class="Domino-module_dot__z3BLH Domino-module_bottomRight__XsqaY"></span></div></button><button id="domino-10-second" class="Domino-module_halfDomino__FWnOS" role="button" tabindex="0" aria-disabled="false" aria-roledescription="draggable" aria-describedby="DndDescribedBy-0" style="box-shadow: rgb(173, 173, 173) 0px -2.2704px inset; transition: box-shadow 400ms;"><div class="Domino-module_dotsWrapper__kkdAC"><span class="Domino-module_dot__z3BLH Domino-module_middle__0bq7B"></span></div></button></div></div><div class="Tray-module_trayDominoWrapper__HxjLu" style="width: 70px; height: 35px; --domino-border-radius: 5.95px; --domino-border-thickness: 1.505px;"><div class="Tray-module_emptyTraySlot__KQ6Lo"></div><div class="Domino-module_domino__hSfP4" style="transform: rotate(0deg); box-shadow: unset;"><button id="domino-11-first" class="Domino-module_halfDomino__FWnOS Domino-module_isFirst__qiM7f" role="button" tabindex="0" aria-disabled="false" aria-roledescription="draggable" aria-describedby="DndDescribedBy-0" style="box-shadow: rgb(173, 173, 173) 0px -2.2704px inset; transition: box-shadow 400ms;"><div class="Domino-module_dotsWrapper__kkdAC"><span class="Domino-module_dot__z3BLH Domino-module_topRight__ALElk"></span><span class="Domino-module_dot__z3BLH Domino-module_topLeft__MOH8P"></span><span class="Domino-module_dot__z3BLH Domino-module_bottomLeft__W5oeb"></span><span class="Domino-module_dot__z3BLH Domino-module_bottomRight__XsqaY"></span><span class="Domino-module_dot__z3BLH Domino-module_middleLeft__w5HnM"></span><span class="Domino-module_dot__z3BLH Domino-module_middleRight__aO70z"></span></div></button><button id="domino-11-second" class="Domino-module_halfDomino__FWnOS" role="button" tabindex="0" aria-disabled="false" aria-roledescription="draggable" aria-describedby="DndDescribedBy-0" style="box-shadow: rgb(173, 173, 173) 0px -2.2704px inset; transition: box-shadow 400ms;"><div class="Domino-module_dotsWrapper__kkdAC"><span class="Domino-module_dot__z3BLH Domino-module_topRight__ALElk"></span><span class="Domino-module_dot__z3BLH Domino-module_topLeft__MOH8P"></span><span class="Domino-module_dot__z3BLH Domino-module_bottomLeft__W5oeb"></span><span class="Domino-module_dot__z3BLH Domino-module_bottomRight__XsqaY"></span></div></button></div></div><div class="Tray-module_trayDominoWrapper__HxjLu" style="width: 70px; height: 35px; --domino-border-radius: 5.95px; --domino-border-thickness: 1.505px;"><div class="Tray-module_emptyTraySlot__KQ6Lo"></div><div class="Domino-module_domino__hSfP4" style="transform: rotate(0deg); box-shadow: unset;"><button id="domino-12-first" class="Domino-module_halfDomino__FWnOS Domino-module_isFirst__qiM7f" role="button" tabindex="0" aria-disabled="false" aria-roledescription="draggable" aria-describedby="DndDescribedBy-0" style="box-shadow: rgb(173, 173, 173) 0px -2.2704px inset; transition: box-shadow 400ms;"><div class="Domino-module_dotsWrapper__kkdAC"><span class="Domino-module_dot__z3BLH Domino-module_topLeft__MOH8P"></span><span class="Domino-module_dot__z3BLH Domino-module_bottomRight__XsqaY"></span></div></button><button id="domino-12-second" class="Domino-module_halfDomino__FWnOS" role="button" tabindex="0" aria-disabled="false" aria-roledescription="draggable" aria-describedby="DndDescribedBy-0" style="box-shadow: rgb(173, 173, 173) 0px -2.2704px inset; transition: box-shadow 400ms;"><div class="Domino-module_dotsWrapper__kkdAC"></div></button></div></div><div class="Tray-module_trayDominoWrapper__HxjLu" style="width: 70px; height: 35px; --domino-border-radius: 5.95px; --domino-border-thickness: 1.505px;"><div class="Tray-module_emptyTraySlot__KQ6Lo"></div><div class="Domino-module_domino__hSfP4" style="transform: rotate(0deg); box-shadow: unset;"><button id="domino-13-first" class="Domino-module_halfDomino__FWnOS Domino-module_isFirst__qiM7f" role="button" tabindex="0" aria-disabled="false" aria-roledescription="draggable" aria-describedby="DndDescribedBy-0" style="box-shadow: rgb(173, 173, 173) 0px -2.2704px inset; transition: box-shadow 400ms;"><div class="Domino-module_dotsWrapper__kkdAC"><span class="Domino-module_dot__z3BLH Domino-module_topLeft__MOH8P"></span><span class="Domino-module_dot__z3BLH Domino-module_middle__0bq7B"></span><span class="Domino-module_dot__z3BLH Domino-module_bottomRight__XsqaY"></span></div></button><button id="domino-13-second" class="Domino-module_halfDomino__FWnOS" role="button" tabindex="0" aria-disabled="false" aria-roledescription="draggable" aria-describedby="DndDescribedBy-0" style="box-shadow: rgb(173, 173, 173) 0px -2.2704px inset; transition: box-shadow 400ms;"><div class="Domino-module_dotsWrapper__kkdAC"><span class="Domino-module_dot__z3BLH Domino-module_topLeft__MOH8P"></span><span class="Domino-module_dot__z3BLH Domino-module_middle__0bq7B"></span><span class="Domino-module_dot__z3BLH Domino-module_bottomRight__XsqaY"></span></div></button></div></div><div class="Tray-module_trayDominoWrapper__HxjLu" style="width: 70px; height: 35px; --domino-border-radius: 5.95px; --domino-border-thickness: 1.505px;"><div class="Tray-module_emptyTraySlot__KQ6Lo"></div><div class="Domino-module_domino__hSfP4" style="transform: rotate(0deg); box-shadow: unset;"><button id="domino-14-first" class="Domino-module_halfDomino__FWnOS Domino-module_isFirst__qiM7f" role="button" tabindex="0" aria-disabled="false" aria-roledescription="draggable" aria-describedby="DndDescribedBy-0" style="box-shadow: rgb(173, 173, 173) 0px -2.2704px inset; transition: box-shadow 400ms;"><div class="Domino-module_dotsWrapper__kkdAC"></div></button><button id="domino-14-second" class="Domino-module_halfDomino__FWnOS" role="button" tabindex="0" aria-disabled="false" aria-roledescription="draggable" aria-describedby="DndDescribedBy-0" style="box-shadow: rgb(173, 173, 173) 0px -2.2704px inset; transition: box-shadow 400ms;"><div class="Domino-module_dotsWrapper__kkdAC"><span class="Domino-module_dot__z3BLH Domino-module_middle__0bq7B"></span></div></button></div></div><div class="Tray-module_trayDominoWrapper__HxjLu" style="width: 70px; height: 35px; --domino-border-radius: 5.95px; --domino-border-thickness: 1.505px;"><div class="Tray-module_emptyTraySlot__KQ6Lo"></div><div class="Domino-module_domino__hSfP4" style="transform: rotate(0deg); box-shadow: unset;"><button id="domino-15-first" class="Domino-module_halfDomino__FWnOS Domino-module_isFirst__qiM7f" role="button" tabindex="0" aria-disabled="false" aria-roledescription="draggable" aria-describedby="DndDescribedBy-0" style="box-shadow: rgb(173, 173, 173) 0px -2.2704px inset; transition: box-shadow 400ms;"><div class="Domino-module_dotsWrapper__kkdAC"><span class="Domino-module_dot__z3BLH Domino-module_topLeft__MOH8P"></span><span class="Domino-module_dot__z3BLH Domino-module_bottomRight__XsqaY"></span></div></button><button id="domino-15-second" class="Domino-module_halfDomino__FWnOS" role="button" tabindex="0" aria-disabled="false" aria-roledescription="draggable" aria-describedby="DndDescribedBy-0" style="box-shadow: rgb(173, 173, 173) 0px -2.2704px inset; transition: box-shadow 400ms;"><div class="Domino-module_dotsWrapper__kkdAC"><span class="Domino-module_dot__z3BLH Domino-module_topRight__ALElk"></span><span class="Domino-module_dot__z3BLH Domino-module_topLeft__MOH8P"></span><span class="Domino-module_dot__z3BLH Domino-module_bottomLeft__W5oeb"></span><span class="Domino-module_dot__z3BLH Domino-module_bottomRight__XsqaY"></span></div></button></div></div></div></div><div id="DndDescribedBy-0" style="display: none;">To pick up a draggable item, press the space bar. While dragging, use the arrow keys to move the item. Press space again to drop the item in its new position, or press escape to cancel.</div><div id="DndLiveRegion-0" role="status" aria-live="assertive" aria-atomic="true" style="position: fixed; top: 0px; left: 0px; width: 1px; height: 1px; margin: -1px; border: 0px; padding: 0px; overflow: hidden; clip: rect(0px, 0px, 0px, 0px); clip-path: inset(100%); white-space: nowrap;"></div></div>`;
+
+
+        // --- UI & EVENT BINDINGS ON LOAD ---
+        window.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+
+            // Set up main event listeners
+            document.getElementById('parse-btn').addEventListener('click', handleParse);
+            document.getElementById('load-sample-btn').addEventListener('click', loadSampleGame);
+            document.getElementById('solve-btn').addEventListener('click', handleSolve);
+            document.getElementById('prev-sol-btn').addEventListener('click', () => changeSolution(-1));
+            document.getElementById('next-sol-btn').addEventListener('click', () => changeSolution(1));
+
+            // Auto-load sample to make the page populated and engaging right away
+            loadSampleGame();
+        });
+
+        // --- DOM HELPER UTILS ---
+        function showNotification(text, type = 'info') {
+            const bar = document.getElementById('notification-bar');
+            const icon = document.getElementById('notification-icon');
+            const txt = document.getElementById('notification-text');
+
+            bar.className = "rounded-xl p-3 text-sm flex items-center gap-3 transition-all duration-300 ";
+            
+            if (type === 'error') {
+                bar.classList.add('bg-rose-50', 'text-rose-800', 'border', 'border-rose-100');
+                icon.setAttribute('data-lucide', 'alert-triangle');
+            } else if (type === 'success') {
+                bar.classList.add('bg-emerald-50', 'text-emerald-800', 'border', 'border-emerald-100');
+                icon.setAttribute('data-lucide', 'check-circle-2');
+            } else {
+                bar.classList.add('bg-blue-50', 'text-blue-800', 'border', 'border-blue-100');
+                icon.setAttribute('data-lucide', 'info');
+            }
+            
+            txt.textContent = text;
+            bar.classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function clearNotification() {
+            document.getElementById('notification-bar').classList.add('hidden');
+        }
+
+        // --- SAMPLE LAUNCHER ---
+        function loadSampleGame() {
+            document.getElementById('html-input').value = SAMPLE_HTML;
+            handleParse();
+            showNotification("Preloaded sample game successfully! Click 'Solve Puzzle' to see the solutions.", "info");
+        }
+
+        // --- STREAMING_CHUNK: Parsing the raw HTML structure correctly ---
+        // --- HTML PARSER FOR NYT PIPS ---
+        function handleParse() {
+            const rawHtml = document.getElementById('html-input').value.trim();
+            if (!rawHtml) {
+                showNotification("Please paste some valid NYT Pips HTML first.", "error");
+                return;
+            }
+
+            try {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(rawHtml, 'text/html');
+
+                // 1. Parse rows and cols
+                const boardContainer = doc.querySelector('[class*="boardContainer"]');
+                let rows = 5;
+                let cols = 6;
+                if (boardContainer) {
+                    const style = boardContainer.getAttribute('style') || '';
+                    const rMatch = style.match(/--rows:\s*(\d+)/);
+                    const cMatch = style.match(/--cols:\s*(\d+)/);
+                    if (rMatch) rows = parseInt(rMatch[1]);
+                    if (cMatch) cols = parseInt(cMatch[1]);
+                }
+
+                // 2. Parse board cells visibility
+                const bgCells = doc.querySelectorAll('[class*="backgroundCell"]');
+                const visibleCells = [];
+                const cellVisibility = Array(rows * cols).fill(false);
+
+                // Note: NYT rendering fills 1-based IDs from board-1 to board-N
+                for (let i = 0; i < rows * cols; i++) {
+                    const cell = doc.getElementById(`board-${i+1}`) || bgCells[i];
+                    if (cell) {
+                        const isHidden = cell.className.toLowerCase().includes('hidden');
+                        if (!isHidden) {
+                            visibleCells.push(i);
+                            cellVisibility[i] = true;
+                        }
+                    }
+                }
+
+                if (visibleCells.length === 0) {
+                    throw new Error("Could not find any active/playable board cells. Check if the correct HTML was pasted.");
+                }
+
+                // 3. Parse Regions using strict immediate child selector
+                const regionCells = doc.querySelectorAll('[class*="regions__"] > div');
+                const cellData = Array(rows * cols).fill(null).map(() => ({ color: 'none', label: null }));
+
+                regionCells.forEach((regCell, idx) => {
+                    if (idx >= rows * cols) return;
+                    
+                    const isHidden = regCell.className.toLowerCase().includes('hidden');
+                    if (isHidden || !cellVisibility[idx]) return;
+
+                    // Detect color from inner element or the regionCell itself
+                    const innerCell = regCell.querySelector('[class*="regionCellInner"]');
+                    const color = detectColor(regCell) || detectColor(innerCell) || 'none';
+
+                    // Detect label/constraint (e.g. "10", "7", ">0")
+                    const labelEl = regCell.querySelector('[class*="regionLabelText"]');
+                    const label = labelEl ? labelEl.textContent.trim() : null;
+
+                    cellData[idx] = { color, label };
+                });
+
+                // Connected Components grouping for correct region parsing (BFS)
+                const visited = Array(rows * cols).fill(false);
+                const regions = {};
+                const cellToRegion = {};
+
+                for (let i = 0; i < rows * cols; i++) {
+                    if (!visibleCells.includes(i)) continue;
+                    if (visited[i]) continue;
+
+                    const color = cellData[i].color;
+                    if (color === 'none') continue;
+
+                    // BFS to group contiguous same-color cells
+                    const component = [];
+                    const queue = [i];
+                    visited[i] = true;
+
+                    while (queue.length > 0) {
+                        const curr = queue.shift();
+                        component.push(curr);
+
+                        const r = Math.floor(curr / cols);
+                        const c = curr % cols;
+                        const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+
+                        for (const [dr, dc] of dirs) {
+                            const nr = r + dr;
+                            const nc = c + dc;
+                            if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) {
+                                const nIdx = nr * cols + nc;
+                                if (visibleCells.includes(nIdx) && !visited[nIdx]) {
+                                    if (cellData[nIdx].color === color) {
+                                        visited[nIdx] = true;
+                                        queue.push(nIdx);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Extract the non-null label from any cell in this contiguous group
+                    let target = null;
+                    for (const cIdx of component) {
+                        if (cellData[cIdx].label) {
+                            target = cellData[cIdx].label;
+                            break;
+                        }
+                    }
+
+                    const regionId = `reg_${Object.keys(regions).length}`;
+                    const regObj = {
+                        id: regionId,
+                        color: color,
+                        cells: component,
+                        target: target
+                    };
+
+                    regions[regionId] = regObj;
+                    component.forEach(cIdx => {
+                        cellToRegion[cIdx] = regObj;
+                    });
+                }
+
+                // 4. Parse Tray Dominoes - using exact prefix to avoid matching nested components
+                const parsedDominoes = [];
+                const trayDominoes = doc.querySelectorAll('[class*="Domino-module_domino__"]');
+                
+                trayDominoes.forEach((domEl, idx) => {
+                    const buttons = domEl.querySelectorAll('button, [class*="halfDomino"]');
+                    if (buttons.length >= 2) {
+                        const firstHalf = buttons[0];
+                        const secondHalf = buttons[1];
+
+                        // Robust leaf-only dot selector to avoid container divs
+                        const countDots = (halfEl) => {
+                            return Array.from(halfEl.querySelectorAll('*')).filter(el => {
+                                const className = (typeof el.className === 'string') ? el.className : (el.getAttribute('class') || '');
+                                return className.includes('dot') && !className.includes('wrapper') && !className.includes('dotsWrapper');
+                            }).length;
+                        };
+
+                        const firstDots = countDots(firstHalf);
+                        const secondDots = countDots(secondHalf);
+
+                        parsedDominoes.push({
+                            id: idx + 1,
+                            pips: [firstDots, secondDots]
+                        });
+                    }
+                });
+
+                if (parsedDominoes.length === 0) {
+                    throw new Error("Could not parse any dominoes from the tray. Ensure tray DOM element is included.");
+                }
+
+                // Update Globals
+                gameState.rows = rows;
+                gameState.cols = cols;
+                gameState.visibleCells = visibleCells;
+                gameState.regions = regions;
+                gameState.cellToRegion = cellToRegion;
+                gameState.dominoes = parsedDominoes;
+                gameState.solutions = [];
+                gameState.currentSolIndex = 0;
+                gameState.viewState = 'original';
+
+                // Display UI Workspace Elements
+                document.getElementById('welcome-banner').classList.add('hidden');
+                document.getElementById('workspace-card').classList.remove('hidden');
+                document.getElementById('workspace-card').classList.add('flex');
+                document.getElementById('game-status-card').classList.remove('hidden');
+                document.getElementById('game-status-card').classList.add('flex');
+                
+                // Disable solution toggling until solve is run
+                document.getElementById('view-solution-btn').disabled = true;
+                document.getElementById('view-solution-btn').classList.add('text-slate-400');
+                document.getElementById('view-solution-btn').classList.remove('text-slate-600');
+                document.getElementById('solutions-navigator').classList.add('hidden');
+
+                // Update Stats Panel
+                document.getElementById('stat-grid-size').textContent = `${rows} × ${cols}`;
+                document.getElementById('stat-playable-cells').textContent = visibleCells.length;
+                document.getElementById('stat-dominoes-count').textContent = parsedDominoes.length;
+                document.getElementById('stat-regions-count').textContent = Object.keys(regions).length;
+
+                clearNotification();
+                
+                // Render Game Layout in the Canvas
+                renderBoard();
+                renderTray();
+
+            } catch (error) {
+                showNotification(`Parsing Error: ${error.message}`, "error");
+            }
+        }
+
+        // Helper to match NYT color class strings
+        function detectColor(element) {
+            if (!element) return null;
+            const classes = Array.from(element.classList);
+            const knownColors = ['purple', 'pink', 'teal', 'orange', 'blue', 'green', 'red', 'yellow'];
+            for (const cls of classes) {
+                for (const color of knownColors) {
+                    if (cls.toLowerCase().includes(color)) {
+                        return color;
+                    }
+                }
+            }
+            return null;
+        }
+
+
+        // --- D3 RENDERING ---
+        // Dynamic D3 drawing of the grid and parsed regions
+        function renderBoard() {
+            const container = d3.select('#board-container');
+            container.selectAll('*').remove();
+
+            const rows = gameState.rows;
+            const cols = gameState.cols;
+
+            const width = cols * CELL_SIZE + GRID_MARGIN * 2;
+            const height = rows * CELL_SIZE + GRID_MARGIN * 2;
+
+            const svg = container.append('svg')
+                .attr('width', '100%')
+                .attr('height', '100%')
+                .attr('viewBox', `0 0 ${width} ${height}`)
+                .style('max-width', `${width}px`);
+
+            const g = svg.append('g')
+                .attr('transform', `translate(${GRID_MARGIN}, ${GRID_MARGIN})`);
+
+            // 1. Draw Cell backgrounds (using styling function directly to prevent CSS override)
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const idx = r * cols + c;
+                    const isVisible = gameState.visibleCells.includes(idx);
+                    
+                    if (isVisible) {
+                        const reg = gameState.cellToRegion[idx];
+                        const colorProps = reg ? COLOR_MAP[reg.color] : COLOR_MAP['none'];
+
+                        g.append('rect')
+                            .attr('x', c * CELL_SIZE)
+                            .attr('y', r * CELL_SIZE)
+                            .attr('width', CELL_SIZE)
+                            .attr('height', CELL_SIZE)
+                            .style('fill', colorProps.bg)
+                            .attr('class', 'cell-border')
+                            .style('transition', 'all 0.2s');
+                    }
+                }
+            }
+
+            // 2. Draw thick custom region boundary dashed outlines inset slightly
+            const inset = 4;
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const idx = r * cols + c;
+                    const isVisible = gameState.visibleCells.includes(idx);
+                    if (!isVisible) continue;
+
+                    const currentRegion = gameState.cellToRegion[idx];
+                    const currentRegId = currentRegion ? currentRegion.id : null;
+                    if (!currentRegion) continue; // Beige cells do not have region outlines
+
+                    const colorProps = COLOR_MAP[currentRegion.color];
+
+                    // Directions checking for neighbor differences
+                    const boundaries = [
+                        { dr: -1, dc: 0, x1: c*CELL_SIZE + inset, y1: r*CELL_SIZE + inset, x2: (c+1)*CELL_SIZE - inset, y2: r*CELL_SIZE + inset }, // Top
+                        { dr: 1, dc: 0, x1: c*CELL_SIZE + inset, y1: (r+1)*CELL_SIZE - inset, x2: (c+1)*CELL_SIZE - inset, y2: (r+1)*CELL_SIZE - inset }, // Bottom
+                        { dr: 0, dc: -1, x1: c*CELL_SIZE + inset, y1: r*CELL_SIZE + inset, x2: c*CELL_SIZE + inset, y2: (r+1)*CELL_SIZE - inset }, // Left
+                        { dr: 0, dc: 1, x1: (c+1)*CELL_SIZE - inset, y1: r*CELL_SIZE + inset, x2: (c+1)*CELL_SIZE - inset, y2: (r+1)*CELL_SIZE - inset }  // Right
+                    ];
+
+                    boundaries.forEach(n => {
+                        const nr = r + n.dr;
+                        const nc = c + n.dc;
+                        const nIdx = nr * cols + nc;
+                        let differentRegion = false;
+
+                        if (nr < 0 || nr >= rows || nc < 0 || nc >= cols || !gameState.visibleCells.includes(nIdx)) {
+                            differentRegion = true; // Board edge / Hidden cell border
+                        } else {
+                            const neighborRegion = gameState.cellToRegion[nIdx];
+                            const neighborRegId = neighborRegion ? neighborRegion.id : null;
+                            if (neighborRegId !== currentRegId) {
+                                differentRegion = true;
+                            }
+                        }
+
+                        if (differentRegion) {
+                            g.append('line')
+                                .attr('x1', n.x1)
+                                .attr('y1', n.y1)
+                                .attr('x2', n.x2)
+                                .attr('y2', n.y2)
+                                .attr('stroke', colorProps.border)
+                                .attr('class', 'region-border');
+                        }
+                    });
+                }
+            }
+
+            // 3. Draw high-fidelity diamond constraint / target badges in regions
+            Object.values(gameState.regions).forEach(reg => {
+                if (!reg.target || reg.cells.length === 0) return;
+
+                // Find the maximum row and maximum column in this region to place badge at bottom-right of that region
+                let maxR = -1;
+                let maxC = -1;
+                reg.cells.forEach(cIdx => {
+                    const row = Math.floor(cIdx / cols);
+                    const col = cIdx % cols;
+                    if (row > maxR) maxR = row;
+                    if (col > maxC) maxC = col;
+                });
+
+                const badgeX = (maxC + 1) * CELL_SIZE;
+                const badgeY = (maxR + 1) * CELL_SIZE;
+                const colorProps = COLOR_MAP[reg.color] || COLOR_MAP['none'];
+
+                const badgeG = g.append('g')
+                    .attr('transform', `translate(${badgeX}, ${badgeY})`);
+
+                // Perfect diamond path with a snazzy concave "bite" taken out of its top-left corner
+                const diamondPath = "M 0,-20 L 20,0 L 0,20 L -20,0 L -12,0 A 12 12 0 0 1 0,-12 Z";
+
+                badgeG.append('path')
+                    .attr('d', diamondPath)
+                    .attr('fill', colorProps.badgeBg)
+                    .style('filter', 'drop-shadow(0px 3px 5px rgba(0,0,0,0.25))');
+
+                badgeG.append('text')
+                    .attr('x', 3)
+                    .attr('y', 5)
+                    .attr('text-anchor', 'middle')
+                    .attr('fill', '#ffffff')
+                    .attr('font-size', '12px')
+                    .attr('font-weight', '800')
+                    .text(reg.target);
+            });
+
+            // 4. Draw placed solution dominoes, if in solution state
+            if (gameState.viewState === 'solution' && gameState.solutions.length > 0) {
+                const solution = gameState.solutions[gameState.currentSolIndex];
+                drawDominoesOnGrid(g, solution);
+            }
+        }
+
+        // Render the Tray showing loaded/parsed tray dominoes
+        function renderTray() {
+            const container = document.getElementById('tray-container');
+            container.innerHTML = '';
+
+            gameState.dominoes.forEach(dom => {
+                const card = document.createElement('div');
+                card.className = "bg-white border border-slate-200 rounded-xl p-2 flex flex-col items-center justify-center gap-2 shadow-sm relative overflow-hidden";
+                
+                // Card header/id
+                const header = document.createElement('span');
+                header.className = "text-[10px] font-bold text-slate-400 absolute top-1 left-2";
+                header.textContent = `#${dom.id}`;
+                card.appendChild(header);
+
+                // Small mini-domino rendering using mini inline SVGs
+                const miniSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                miniSvg.setAttribute("width", "64");
+                miniSvg.setAttribute("height", "32");
+                miniSvg.setAttribute("viewBox", "0 0 80 40");
+                miniSvg.className.baseVal = "mt-3";
+
+                // Domino Backing
+                const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                rect.setAttribute("x", "2");
+                rect.setAttribute("y", "2");
+                rect.setAttribute("width", "76");
+                rect.setAttribute("height", "36");
+                rect.setAttribute("rx", "6");
+                rect.setAttribute("fill", "#fdfcf9");
+                rect.setAttribute("stroke", "#334155");
+                rect.setAttribute("stroke-width", "2");
+                miniSvg.appendChild(rect);
+
+                // Divider line
+                const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                line.setAttribute("x1", "40");
+                line.setAttribute("y1", "2");
+                line.setAttribute("x2", "40");
+                line.setAttribute("y2", "38");
+                line.setAttribute("stroke", "#334155");
+                line.setAttribute("stroke-width", "1.5");
+                line.setAttribute("stroke-dasharray", "2,1");
+                miniSvg.appendChild(line);
+
+                // Draw dots for both halves
+                drawDotsOnHalf(miniSvg, 20, 20, dom.pips[0], 40);
+                drawDotsOnHalf(miniSvg, 60, 20, dom.pips[1], 40);
+
+                card.appendChild(miniSvg);
+                container.appendChild(card);
+            });
+        }
+
+        // SVG Drawing utility to position Domino pips
+        function drawDotsOnHalf(svgG, cx, cy, pipsCount, size = 80) {
+            const step = size / 4;
+            const offsets = {
+                middle: [0, 0],
+                topLeft: [-step, -step],
+                bottomRight: [step, step],
+                topRight: [step, -step],
+                bottomLeft: [-step, step],
+                middleLeft: [-step, 0],
+                middleRight: [step, 0]
+            };
+
+            const mapping = {
+                0: [],
+                1: ['middle'],
+                2: ['topLeft', 'bottomRight'],
+                3: ['topLeft', 'middle', 'bottomRight'],
+                4: ['topLeft', 'topRight', 'bottomLeft', 'bottomRight'],
+                5: ['topLeft', 'topRight', 'middle', 'bottomLeft', 'bottomRight'],
+                6: ['topLeft', 'topRight', 'middleLeft', 'middleRight', 'bottomLeft', 'bottomRight']
+            };
+
+            const dots = mapping[pipsCount] || [];
+            const r = size >= 80 ? 5 : 2.5; // Scale dot radius
+
+            dots.forEach(pos => {
+                const off = offsets[pos];
+                const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                circle.setAttribute("cx", cx + off[0]);
+                circle.setAttribute("cy", cy + off[1]);
+                circle.setAttribute("r", r);
+                circle.setAttribute("class", "pip-dot");
+                svgG.appendChild(circle);
+            });
+        }
+
+        // Dynamic rendering of placed dominoes during solved state
+        function drawDominoesOnGrid(d3Group, solution) {
+            const cols = gameState.cols;
+
+            solution.forEach((placement, idx) => {
+                const { dominoId, cell1, cell2, val1, val2 } = placement;
+
+                const r1 = Math.floor(cell1 / cols);
+                const c1 = cell1 % cols;
+                const r2 = Math.floor(cell2 / cols);
+                const c2 = cell2 % cols;
+
+                const isHorizontal = (r1 === r2);
+
+                const domG = d3Group.append('g')
+                    .style('opacity', 0)
+                    .attr('class', 'solution-domino');
+
+                domG.transition()
+                    .delay(idx * 80)
+                    .duration(300)
+                    .style('opacity', 1);
+
+                let x, y, w, h, midX1, midY1, midX2, midY2;
+                let half1_cx, half1_cy, half2_cx, half2_cy;
+
+                if (isHorizontal) {
+                    const minC = Math.min(c1, c2);
+                    x = minC * CELL_SIZE + CELL_PADDING;
+                    y = r1 * CELL_SIZE + CELL_PADDING;
+                    w = CELL_SIZE * 2 - CELL_PADDING * 2;
+                    h = CELL_SIZE - CELL_PADDING * 2;
+                    
+                    midX1 = (minC + 1) * CELL_SIZE;
+                    midY1 = y;
+                    midX2 = midX1;
+                    midY2 = y + h;
+
+                    if (c1 < c2) {
+                        half1_cx = x + CELL_SIZE / 2;
+                        half2_cx = x + CELL_SIZE + CELL_SIZE / 2 - CELL_PADDING;
+                    } else {
+                        half2_cx = x + CELL_SIZE / 2;
+                        half1_cx = x + CELL_SIZE + CELL_SIZE / 2 - CELL_PADDING;
+                    }
+                    half1_cy = y + h / 2;
+                    half2_cy = half1_cy;
+
+                } else {
+                    const minR = Math.min(r1, r2);
+                    x = c1 * CELL_SIZE + CELL_PADDING;
+                    y = minR * CELL_SIZE + CELL_PADDING;
+                    w = CELL_SIZE - CELL_PADDING * 2;
+                    h = CELL_SIZE * 2 - CELL_PADDING * 2;
+
+                    midX1 = x;
+                    midY1 = (minR + 1) * CELL_SIZE;
+                    midX2 = x + w;
+                    midY2 = midY1;
+
+                    if (r1 < r2) {
+                        half1_cy = y + CELL_SIZE / 2;
+                        half2_cy = y + CELL_SIZE + CELL_SIZE / 2 - CELL_PADDING;
+                    } else {
+                        half2_cy = y + CELL_SIZE / 2;
+                        half1_cy = y + CELL_SIZE + CELL_SIZE / 2 - CELL_PADDING;
+                    }
+                    half1_cx = x + w / 2;
+                    half2_cx = half1_cx;
+                }
+
+                domG.append('rect')
+                    .attr('x', x)
+                    .attr('y', y)
+                    .attr('width', w)
+                    .attr('height', h)
+                    .attr('class', 'domino-body');
+
+                domG.append('line')
+                    .attr('x1', midX1)
+                    .attr('y1', midY1)
+                    .attr('x2', midX2)
+                    .attr('y2', midY2)
+                    .attr('class', 'domino-line');
+
+                drawDotsOnHalf(domG.node(), half1_cx, half1_cy, val1, CELL_SIZE);
+                drawDotsOnHalf(domG.node(), half2_cx, half2_cy, val2, CELL_SIZE);
+
+                domG.append('text')
+                    .attr('x', x + 10)
+                    .attr('y', y + 16)
+                    .attr('fill', '#94a3b8')
+                    .attr('font-size', '8px')
+                    .attr('font-weight', '600')
+                    .text(`D${dominoId}`);
+            });
+        }
+
+
+        // --- CONSTRAINT SOLVER (Joint Tiling + Domino Assignment Backtracking) ---
+        function handleSolve() {
+            if (gameState.dominoes.length === 0) return;
+
+            const solveBtn = document.getElementById('solve-btn');
+            const originalText = solveBtn.innerHTML;
+            solveBtn.disabled = true;
+            solveBtn.innerHTML = `<i data-lucide="loader" class="w-4 h-4 animate-spin"></i> Solving...`;
+            lucide.createIcons();
+
+            setTimeout(() => {
+                const start = performance.now();
+                const solutions = solveCSP();
+                const end = performance.now();
+
+                solveBtn.disabled = false;
+                solveBtn.innerHTML = originalText;
+                lucide.createIcons();
+
+                if (solutions.length > 0) {
+                    gameState.solutions = solutions;
+                    gameState.currentSolIndex = 0;
+                    
+                    showNotification(`Success! Found ${solutions.length} valid solution(s) in ${(end - start).toFixed(1)} ms.`, "success");
+                    
+                    document.getElementById('view-solution-btn').disabled = false;
+                    document.getElementById('view-solution-btn').classList.remove('text-slate-400');
+                    document.getElementById('view-solution-btn').classList.add('text-slate-600');
+
+                    if (solutions.length > 1) {
+                        document.getElementById('solutions-navigator').classList.remove('hidden');
+                        document.getElementById('solutions-navigator').classList.add('flex');
+                        updateSolutionLabel();
+                    } else {
+                        document.getElementById('solutions-navigator').classList.add('hidden');
+                    }
+
+                    setViewState('solution');
+                } else {
+                    showNotification("Constraint solver failed. No viable domino configuration satisfies all region sums.", "error");
+                    setViewState('original');
+                }
+            }, 50);
+        }
+
+        function solveCSP() {
+            const rows = gameState.rows;
+            const cols = gameState.cols;
+            const visible = gameState.visibleCells;
+            const dominoes = gameState.dominoes;
+            const regions = gameState.regions;
+
+            if (visible.length !== dominoes.length * 2) {
+                console.error("Mismatch of domino capacity and visible grid space.");
+                return [];
+            }
+
+            const boardValues = Array(rows * cols).fill(null);
+            const placed = Array(dominoes.length).fill(false);
+            const placements = [];
+            const solutions = [];
+            const unmatched = new Set(visible);
+
+            const getNeighbors = (cellIdx) => {
+                const r = Math.floor(cellIdx / cols);
+                const c = cellIdx % cols;
+                const result = [];
+                const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+                for (const [dr, dc] of dirs) {
+                    const nr = r + dr;
+                    const nc = c + dc;
+                    if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) {
+                        const nIdx = nr * cols + nc;
+                        if (unmatched.has(nIdx)) {
+                            result.push(nIdx);
+                        }
+                    }
+                }
+                return result;
+            };
+
+            // Evaluates mathematical region constraints
+            function checkRegions() {
+                for (const reg of Object.values(regions)) {
+                    let sum = 0;
+                    let filledCount = 0;
+                    const values = [];
+
+                    for (const cellIdx of reg.cells) {
+                        if (boardValues[cellIdx] !== null) {
+                            const val = boardValues[cellIdx];
+                            sum += val;
+                            filledCount++;
+                            values.push(val);
+                        }
+                    }
+
+                    const isCompleted = (filledCount === reg.cells.length);
+
+                    if (reg.target) {
+                        if (reg.target === '=') {
+                            if (values.length > 1) {
+                                const first = values[0];
+                                for (let v of values) {
+                                    if (v !== first) return false;
+                                }
+                            }
+                        } else if (reg.target === '<>' || reg.target === '≠') {
+                            if (values.length > 1) {
+                                const set = new Set(values);
+                                if (set.size !== values.length) return false;
+                            }
+                        } else if (reg.target.startsWith('>')) {
+                            const val = parseInt(reg.target.substring(1));
+                            if (isCompleted && sum <= val) return false;
+                        } else if (reg.target.startsWith('<')) {
+                            const val = parseInt(reg.target.substring(1));
+                            if (isCompleted && sum >= val) return false;
+                        } else {
+                            const targetVal = parseInt(reg.target);
+                            if (!isNaN(targetVal)) {
+                                if (sum > targetVal) return false; 
+                                if (isCompleted && sum !== targetVal) return false;
+                            }
+                        }
+                    }
+                }
+                return true;
+            }
+
+            // High performance joint Tiling & Domino backtracking search
+            function backtrack() {
+                if (solutions.length >= 50) return;
+
+                if (unmatched.size === 0) {
+                    solutions.push(JSON.parse(JSON.stringify(placements)));
+                    return;
+                }
+
+                const cell1 = Array.from(unmatched).sort((a,b) => a-b)[0];
+                const neighbors = getNeighbors(cell1);
+
+                for (const cell2 of neighbors) {
+                    unmatched.delete(cell1);
+                    unmatched.delete(cell2);
+
+                    for (let d = 0; d < dominoes.length; d++) {
+                        if (placed[d]) continue;
+
+                        const dom = dominoes[d];
+                        const [v1, v2] = dom.pips;
+
+                        placed[d] = true;
+
+                        // Try Orientation 1: cell1 = v1, cell2 = v2
+                        boardValues[cell1] = v1;
+                        boardValues[cell2] = v2;
+                        placements.push({ dominoId: dom.id, cell1, cell2, val1: v1, val2: v2 });
+
+                        if (checkRegions()) {
+                            backtrack();
+                        }
+
+                        placements.pop();
+
+                        // Try Orientation 2: cell1 = v2, cell2 = v1
+                        if (v1 !== v2) {
+                            boardValues[cell1] = v2;
+                            boardValues[cell2] = v1;
+                            placements.push({ dominoId: dom.id, cell1, cell2, val1: v2, val2: v1 });
+
+                            if (checkRegions()) {
+                                backtrack();
+                            }
+
+                            placements.pop();
+                        }
+
+                        // Reset state
+                        boardValues[cell1] = null;
+                        boardValues[cell2] = null;
+                        placed[d] = false;
+                    }
+
+                    unmatched.add(cell1);
+                    unmatched.add(cell2);
+                }
+            }
+
+            backtrack();
+            return solutions;
+        }
+
+
+        // --- INTERACTIVE HUB STATE CONTROLLERS ---
+
+        function setViewState(view) {
+            gameState.viewState = view;
+
+            const origBtn = document.getElementById('view-original-btn');
+            const solBtn = document.getElementById('view-solution-btn');
+
+            if (view === 'original') {
+                origBtn.className = "px-3 py-1.5 text-xs font-semibold rounded-lg bg-white shadow-sm text-slate-800 border border-slate-200/50";
+                solBtn.className = "px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-400 hover:text-slate-600";
+            } else {
+                solBtn.className = "px-3 py-1.5 text-xs font-semibold rounded-lg bg-white shadow-sm text-slate-800 border border-slate-200/50";
+                origBtn.className = "px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-400 hover:text-slate-600";
+            }
+
+            renderBoard();
+        }
+
+        function changeSolution(offset) {
+            if (gameState.solutions.length === 0) return;
+            
+            let newIndex = gameState.currentSolIndex + offset;
+            if (newIndex >= gameState.solutions.length) newIndex = 0;
+            if (newIndex < 0) newIndex = gameState.solutions.length - 1;
+
+            gameState.currentSolIndex = newIndex;
+            updateSolutionLabel();
+            renderBoard();
+        }
+
+        function updateSolutionLabel() {
+            const countLabel = document.getElementById('solution-count-label');
+            countLabel.textContent = `Solution ${gameState.currentSolIndex + 1} of ${gameState.solutions.length}`;
+        }
+
+    </script>
+</body>
+</html>
