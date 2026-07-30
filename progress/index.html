@@ -7,22 +7,51 @@
     <title>Progress Tracker</title>
     <link rel="stylesheet" href="style.css">
     <link rel="icon" href="icon.svg">
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 
 <body>
     <div id="container">
         <div id="header">
             <h1><img src="icon.svg" width="20px"> Progress Tracker</h1>
-            <p>R to reset</p>
-            <p id="nodata" style="display: block;">No data yet! Touch or type to start</p>
+            <div id="shortcutsInfo">
+                <p>O for OCR</p>
+                <p>R to reset</p>
+            </div>
+            <p id="nodata" style="display: block;">No data yet! Touch or type to start, or press O for OCR screen tracking</p>
         </div>
+        
         <svg id="visualisation" viewBox="0 0 900 250">
         </svg>
+
+        <!-- OCR Status Badge when active -->
+        <div id="ocrStatusBadge" style="display: none;">
+            <span id="ocrStatusText">OCR Active: Scanning...</span>
+            <button id="stopOcrBtn" type="button">Stop OCR</button>
+        </div>
+
         <div id="userInputBox">
             <input name="userInput" id="userInput" value="" type="text" inputmode="decimal" placeholder="0" autocomplete="off">
             <button type="button" id="unitBtn" title="Click to change target denominator">%</button>
         </div>
     </div>
+
+    <!-- OCR Screen Capture & Selection Modal -->
+    <div id="ocrModal" style="display: none;">
+        <div id="ocrModalCard">
+            <h2>Select Area to Track via OCR</h2>
+            <p>Click and drag a box over the progress text/number on your screen share preview below.</p>
+            <div id="ocrCanvasWrapper">
+                <video id="ocrVideo" autoplay playsinline style="display: none;"></video>
+                <canvas id="ocrCanvas"></canvas>
+            </div>
+            <div id="ocrModalActions">
+                <button id="startOcrTrackingBtn" type="button" disabled>Start Tracking Selected Area</button>
+                <button id="cancelOcrModalBtn" type="button">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <div id="by">By <a target="_blank" href="https://twitter.com/lucaslugao">@lucaslugao</a></div>
     <script src="main.js"></script>
 </body>

@@ -10,6 +10,16 @@
   /** @type {SVGElement} */
   const visualisation = document.getElementById("visualisation");
 
+  /** OCR Elements */
+  const ocrStatusBadge = document.getElementById("ocrStatusBadge");
+  const ocrStatusText = document.getElementById("ocrStatusText");
+  const stopOcrBtn = document.getElementById("stopOcrBtn");
+  const ocrModal = document.getElementById("ocrModal");
+  const ocrVideo = document.getElementById("ocrVideo");
+  const ocrCanvas = document.getElementById("ocrCanvas");
+  const startOcrTrackingBtn = document.getElementById("startOcrTrackingBtn");
+  const cancelOcrModalBtn = document.getElementById("cancelOcrModalBtn");
+
   /** @type {{ts: Date, pos: number}[]} */
   const data = [];
   /** @type {number | null} */
@@ -19,6 +29,16 @@
   let targetMax = 100;
   let isPercentMode = true;
   let isEditingDenominator = false;
+
+  /** OCR State */
+  let ocrStream = null;
+  let ocrWorker = null;
+  let ocrInterval = null;
+  let ocrSelection = null;
+  let isOcrScanning = false;
+  let isDraggingSelection = false;
+  let dragStart = { x: 0, y: 0 };
+  let currentSelectionRect = null;
 
   function updateUnitBtnUI() {
     if (isPercentMode || targetMax === 100) {
@@ -30,7 +50,6 @@
     }
   }
 
-  // Click unit button (%) to start editing denominator
   unitBtn.addEventListener("click", (e) => {
     e.stopPropagation();
     e.preventDefault();
@@ -247,7 +266,6 @@
       maxPos = Math.max(maxPos, getPoint(index).pos);
     }
 
-    // Dynamic time window maintaining ~5 points in view
     const nowTs = new Date().getTime();
     let maxTs = nowTs;
     if (nextPoint && nextPoint.ts.getTime() > maxTs) {
@@ -277,7 +295,6 @@
       };
     }
 
-    // Connect historical points with line path & area fill
     const historicalCoords = data.map((d) => getPointCoordinates(d.ts, d.pos));
     if (historicalCoords.length > 1) {
       let pathD = `M ${historicalCoords[0].x.toFixed(1)},${historicalCoords[0].y.toFixed(1)}`;
@@ -308,7 +325,6 @@
       removeElement(visualisation, "area-history");
     }
 
-    // Connect projection line to ETA point
     if (nextPoint && historicalCoords.length > 0) {
       const lastCoord = historicalCoords[historicalCoords.length - 1];
       const etaCoord = getPointCoordinates(nextPoint.ts, nextPoint.pos);
@@ -325,7 +341,6 @@
       removeElement(visualisation, "path-projection");
     }
 
-    // Draw individual point markers & labels
     let lastTickX = null;
     for (let index = getPointCount() - 1; index >= 0; index--) {
       const { ts, pos } = getPoint(index);
@@ -404,6 +419,7 @@
     }
   }
 
+  // Prevent input numbers from exceeding targetMax during numerator entry
   userInput.addEventListener("input", (e) => {
     let raw = e.target.value.replace(/[^0-9\.]/g, "");
     const parts = raw.split(".");
@@ -449,9 +465,223 @@
     update();
   }
 
+  // ==================== OCR Implementation ====================
+
+  async function startOcrSetup() {
+    try {
+      ocrStream = await navigator.mediaDevices.getDisplayMedia({
+        video: { cursor: "always" },
+        audio: false,
+      });
+
+      ocrVideo.srcObject = ocrStream;
+
+      ocrVideo.onloadedmetadata = () => {
+        ocrVideo.play();
+        const vw = ocrVideo.videoWidth || 800;
+        const vh = ocrVideo.videoHeight || 600;
+
+        ocrCanvas.width = vw;
+        ocrCanvas.height = vh;
+
+        const ctx = ocrCanvas.getContext("2d");
+        ctx.drawImage(ocrVideo, 0, 0, vw, vh);
+
+        ocrModal.style.display = "flex";
+        currentSelectionRect = null;
+        startOcrTrackingBtn.disabled = true;
+      };
+
+      ocrStream.getVideoTracks()[0].addEventListener("ended", () => {
+        stopOcrTracking();
+      });
+    } catch (err) {
+      console.warn("Screen share cancelled or failed:", err);
+    }
+  }
+
+  function drawOcrSelectionFrame() {
+    const ctx = ocrCanvas.getContext("2d");
+    ctx.drawImage(ocrVideo, 0, 0, ocrCanvas.width, ocrCanvas.height);
+
+    if (currentSelectionRect) {
+      const { x, y, w, h } = currentSelectionRect;
+      ctx.strokeStyle = "#4cd964";
+      ctx.lineWidth = 3;
+      ctx.strokeRect(x, y, w, h);
+
+      ctx.fillStyle = "rgba(76, 217, 100, 0.15)";
+      ctx.fillRect(x, y, w, h);
+    }
+  }
+
+  ocrCanvas.addEventListener("mousedown", (e) => {
+    const rect = ocrCanvas.getBoundingClientRect();
+    const scaleX = ocrCanvas.width / rect.width;
+    const scaleY = ocrCanvas.height / rect.height;
+
+    dragStart.x = (e.clientX - rect.left) * scaleX;
+    dragStart.y = (e.clientY - rect.top) * scaleY;
+    isDraggingSelection = true;
+  });
+
+  ocrCanvas.addEventListener("mousemove", (e) => {
+    if (!isDraggingSelection) return;
+    const rect = ocrCanvas.getBoundingClientRect();
+    const scaleX = ocrCanvas.width / rect.width;
+    const scaleY = ocrCanvas.height / rect.height;
+
+    const currentX = (e.clientX - rect.left) * scaleX;
+    const currentY = (e.clientY - rect.top) * scaleY;
+
+    const x = Math.min(dragStart.x, currentX);
+    const y = Math.min(dragStart.y, currentY);
+    const w = Math.abs(currentX - dragStart.x);
+    const h = Math.abs(currentY - dragStart.y);
+
+    currentSelectionRect = { x, y, w, h };
+    drawOcrSelectionFrame();
+  });
+
+  ocrCanvas.addEventListener("mouseup", () => {
+    if (isDraggingSelection) {
+      isDraggingSelection = false;
+      if (currentSelectionRect && currentSelectionRect.w > 10 && currentSelectionRect.h > 10) {
+        startOcrTrackingBtn.disabled = false;
+      }
+    }
+  });
+
+  cancelOcrModalBtn.addEventListener("click", () => {
+    closeOcrModal();
+    stopOcrTracking();
+  });
+
+  function closeOcrModal() {
+    ocrModal.style.display = "none";
+  }
+
+  startOcrTrackingBtn.addEventListener("click", () => {
+    if (!currentSelectionRect) return;
+    ocrSelection = { ...currentSelectionRect };
+    closeOcrModal();
+    initiateOcrLoop();
+  });
+
+  async function initiateOcrLoop() {
+    ocrStatusBadge.style.display = "flex";
+    ocrStatusText.textContent = "OCR Active: Initializing Tesseract engine...";
+
+    if (!ocrWorker) {
+      if (typeof Tesseract !== "undefined") {
+        ocrWorker = await Tesseract.createWorker("eng");
+      } else {
+        ocrStatusText.textContent = "OCR Error: Tesseract.js library not loaded.";
+        return;
+      }
+    }
+
+    ocrStatusText.textContent = "OCR Active: Scanning selected region...";
+
+    if (ocrInterval) clearInterval(ocrInterval);
+    ocrInterval = setInterval(performOcrScan, 2500);
+    performOcrScan();
+  }
+
+  async function performOcrScan() {
+    if (!ocrWorker || !ocrSelection || !ocrVideo || ocrVideo.readyState < 2) return;
+
+    try {
+      const { x, y, w, h } = ocrSelection;
+      const offCanvas = document.createElement("canvas");
+      offCanvas.width = Math.max(1, w);
+      offCanvas.height = Math.max(1, h);
+      const offCtx = offCanvas.getContext("2d");
+
+      offCtx.drawImage(ocrVideo, x, y, w, h, 0, 0, w, h);
+
+      // Pre-processing: Binarize image to sharpen text contrast
+      const imgData = offCtx.getImageData(0, 0, w, h);
+      const d = imgData.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const avg = (d[i] + d[i + 1] + d[i + 2]) / 3;
+        const v = avg > 140 ? 255 : 0;
+        d[i] = v;
+        d[i + 1] = v;
+        d[i + 2] = v;
+      }
+      offCtx.putImageData(imgData, 0, 0);
+
+      const res = await ocrWorker.recognize(offCanvas);
+      const text = res.data.text ? res.data.text.trim() : "";
+
+      // Regex 1: Match fractions e.g. "15/40"
+      const fracMatch = text.match(/(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)/);
+      if (fracMatch) {
+        const num = parseFloat(fracMatch[1]);
+        const denom = parseFloat(fracMatch[2]);
+        if (!isNaN(denom) && denom > 0) {
+          targetMax = denom;
+          isPercentMode = false;
+          updateUnitBtnUI();
+        }
+        if (!isNaN(num)) {
+          logOcrDataPoint(num);
+          ocrStatusText.textContent = `OCR Active: Logged ${num}/${targetMax}`;
+          return;
+        }
+      }
+
+      // Regex 2: Match single percentage or decimal number
+      const numMatch = text.match(/(\d+(?:\.\d+)?)/);
+      if (numMatch) {
+        const num = parseFloat(numMatch[1]);
+        if (!isNaN(num)) {
+          logOcrDataPoint(num);
+          ocrStatusText.textContent = `OCR Active: Logged ${isPercentMode ? num + '%' : num + '/' + targetMax}`;
+        }
+      }
+    } catch (err) {
+      console.warn("OCR Scan Error:", err);
+    }
+  }
+
+  function logOcrDataPoint(val) {
+    if (val > targetMax) return;
+    const lastPoint = data.length > 0 ? data[data.length - 1].pos : null;
+    if (lastPoint !== val) {
+      data.push({ ts: new Date(), pos: val });
+      update();
+    }
+  }
+
+  function stopOcrTracking() {
+    if (ocrInterval) {
+      clearInterval(ocrInterval);
+      ocrInterval = null;
+    }
+    if (ocrStream) {
+      ocrStream.getTracks().forEach((track) => track.stop());
+      ocrStream = null;
+    }
+    ocrStatusBadge.style.display = "none";
+  }
+
+  stopOcrBtn.addEventListener("click", () => {
+    stopOcrTracking();
+  });
+
+  // Keybindings listener
   addEventListener("keydown", (e) => {
     const isTyping = document.activeElement === userInput;
     const inputBoxVisible = inputBox.style.display != "none";
+
+    // O key triggers OCR screen setup mode
+    if (e.key.toUpperCase() === "O" && !isTyping && ocrModal.style.display === "none") {
+      e.preventDefault();
+      startOcrSetup();
+      return;
+    }
 
     // Slash '/' triggers denominator selector
     if (e.key === "/") {
@@ -484,12 +714,15 @@
       visualisation.innerHTML = "";
       document.title = "Progress Tracker";
       hideInput();
+      stopOcrTracking();
+      closeOcrModal();
       update();
       return;
     }
 
     if (dismiss) {
       hideInput();
+      closeOcrModal();
       return;
     }
 
@@ -528,7 +761,13 @@
   });
 
   addEventListener("click", (e) => {
-    if (e.target.tagName !== "A" && e.target !== unitBtn && !unitBtn.contains(e.target)) {
+    if (
+      e.target.tagName !== "A" &&
+      e.target !== unitBtn &&
+      !unitBtn.contains(e.target) &&
+      ocrModal.style.display === "none" &&
+      e.target !== stopOcrBtn
+    ) {
       showInput();
       e.preventDefault();
     }
