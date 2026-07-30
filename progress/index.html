@@ -3,6 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Progress Tracker</title>
     <link rel="stylesheet" href="style.css">
     <link rel="icon" href="icon.svg">
@@ -18,8 +19,8 @@
         <svg id="visualisation" viewBox="0 0 900 250">
         </svg>
         <div id="userInputBox">
-            <input name="userInput" id="userInput" value="" type="number" step=".01">
-            <p>% </p>
+            <input name="userInput" id="userInput" value="" type="text" inputmode="decimal" placeholder="0" autocomplete="off">
+            <button type="button" id="unitBtn" title="Click to change target denominator">%</button>
         </div>
     </div>
     <div id="by">By <a target="_blank" href="https://twitter.com/lucaslugao">@lucaslugao</a></div>

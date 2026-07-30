@@ -1,9 +1,12 @@
 :root {
+    --bg-color: rgb(31, 35, 30);
     --elements-bg-color: rgb(46, 55, 47);
+    --olive-medium: rgb(68, 80, 69);
+    --olive-light: rgb(92, 108, 93);
 }
 
 body {
-    background-color: rgb(31, 35, 30);
+    background-color: var(--bg-color);
     color: white;
     display: flex;
     justify-content: center;
@@ -25,63 +28,78 @@ body {
     display: flex;
     flex-direction: row;
     justify-content: space-between;
-    margin-bottom: 10px;
+    align-items: flex-end;
+    margin-bottom: 15px;
 }
-#header > *{
-    margin: auto 0 0 0;
+
+#header > * {
+    margin: 0;
 }
+
 #visualisation {
     width: 100%;
-    height: 70svh;
-    max-height: 250px;
+    height: 250px;
+    border-radius: 8px;
+    overflow: hidden;
+    box-sizing: border-box;
+    display: block;
 }
 
 #userInputBox {
     background-color: var(--elements-bg-color);
     width: 100%;
-    height: 200px;
+    min-height: 160px;
     align-items: center;
-    font: 120px monospace;
+    font: 90px monospace;
     justify-content: space-between;
     display: none;
     margin-top: 20px;
-}
-
-#userInputBox p {
-    padding-right: 20px;
+    padding: 0 30px;
+    box-sizing: border-box;
+    border-radius: 8px;
+    border: 1px solid var(--olive-medium);
 }
 
 #userInput {
     background-color: transparent;
     color: white;
     border: none;
-    padding: 20px;
+    padding: 20px 0;
     font: inherit;
-    width: 100%;
+    width: 55%;
+    min-width: 100px;
+}
+
+#unitBtn {
+    color: white;
+    cursor: pointer;
+    user-select: none;
+    padding: 4px 16px;
+    border-radius: 6px;
+    background-color: var(--olive-medium);
+    border: 1px solid var(--olive-light);
+    font: inherit;
+    font-size: 50px;
+    transition: background-color 0.2s, border-color 0.2s;
+    outline: none;
+}
+
+#unitBtn:hover {
+    background-color: var(--olive-light);
+    border-color: white;
 }
 
 input:focus {
     outline: none;
 }
 
-input::-webkit-outer-spin-button,
-input::-webkit-inner-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-}
-
-input[type=number] {
-    -moz-appearance: textfield;
-}
-
 #by {
     position: absolute;
-    top: 0;
+    top: 50%;
     right: 0;
     padding: 15px;
     font-size: 12px;
     color: white;
-    top: 50%;
     transform: translateY(-50%);
     writing-mode: vertical-rl;
     text-orientation: mixed;

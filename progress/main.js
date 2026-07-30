@@ -1,31 +1,53 @@
 (function main() {
   /** @type {HTMLElement} */
   const inputBox = document.getElementById("userInputBox");
-  /** @type {HTMLElement} */
+  /** @type {HTMLInputElement} */
   const userInput = document.getElementById("userInput");
+  /** @type {HTMLButtonElement} */
+  const unitBtn = document.getElementById("unitBtn");
   /** @type {HTMLElement} */
   const nodata = document.getElementById("nodata");
   /** @type {SVGElement} */
   const visualisation = document.getElementById("visualisation");
+
   /** @type {{ts: Date, pos: number}[]} */
   const data = [];
   /** @type {number | null} */
   let userEnteredPos = null;
 
-  /**
-   * Creates or updates an SVG element within a given parent element. If an
-   * element with the specified ID does not exist, a new SVG element with that
-   * ID and the specified tag name is created. If it exists, the existing
-   * element is updated with the provided attributes. This function ensures
-   * that the created or updated element is compliant with SVG standards by
-   * using the appropriate namespace.
-   *
-   * @param {SVGElement} parent
-   * @param {string} id
-   * @param {string} tagName
-   * @param {Object.<string, string>} attributes
-   * @returns {SVGElement}
-   */
+  /** Target Denominator State */
+  let targetMax = 100;
+  let isPercentMode = true;
+  let isEditingDenominator = false;
+
+  function updateUnitBtnUI() {
+    if (isPercentMode || targetMax === 100) {
+      unitBtn.textContent = "%";
+      unitBtn.title = "Click or type '/' to set custom target denominator";
+    } else {
+      unitBtn.textContent = `/ ${targetMax}`;
+      unitBtn.title = "Click or type '/' to edit target denominator";
+    }
+  }
+
+  // Click unit button (%) to start editing denominator
+  unitBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    isEditingDenominator = true;
+    unitBtn.style.display = "none";
+
+    userInput.value = targetMax.toString();
+    userEnteredPos = targetMax;
+    userInput.placeholder = "Target";
+
+    setTimeout(() => {
+      userInput.focus();
+      userInput.select();
+    }, 10);
+  });
+
+  // SVG helper functions
   function setElement(parent, id, tagName, attributes) {
     let element = parent.querySelector(`#${id}`);
     if (!element) {
@@ -38,21 +60,14 @@
     }
     return element;
   }
+
   function removeElement(parent, id) {
     let element = parent.querySelector(`#${id}`);
     if (element) {
       element.remove();
     }
   }
-  /**
-   * Returns a human-readable string for a given date, either as a relative time difference for past dates
-   * or as a detailed ETA for future dates. For past dates, it shows only the largest time unit greater than zero
-   * (e.g., "3h ago"). For future dates, it provides a detailed ETA with the exact time (e.g., "ETA: 3h 20m 15s @ 15:45").
-   *
-   * @param {Date} date - The date to be converted into a human-readable string.
-   * @param {boolean} ETA - If true, the string will be formatted as a detailed ETA.
-   * @returns {string} A string representing the relative time difference or detailed ETA.
-   */
+
   function friendlyDate(date, ETA = false) {
     const now = new Date();
     const diff = Math.floor((date.getTime() - now.getTime()) / 1000);
@@ -77,16 +92,9 @@
     return "-" + values[0];
   }
 
-  /**
-   * Calculate the Estimated Time of Arrival (ETA) based on the last n data points
-   * @param {{ts: Date, pos: number}[]} data - Array of data points with timestamp and position
-   * @param {number} n - Number of data points to consider (default is 5)
-   * @returns {{nextPoint: {ts: Date, pos: number}, message: string}}
-   */
-  function calculateETA(data, n = 5) {
+  function calculateETA(data, targetMaxVal = 100, n = 5) {
     const now = new Date();
 
-    // Get the most recent n points
     const recentPoints = data.slice(-n).map((d) => ({
       x: (d.ts.getTime() - now.getTime()) / 1000,
       y: d.pos,
@@ -94,14 +102,12 @@
 
     const lastPoint = recentPoints[recentPoints.length - 1];
 
-    // Calculate average speeds
     let averageSpeeds = [];
     for (let i = 0; i < recentPoints.length - 1; i++) {
       const { x, y } = recentPoints[i];
       averageSpeeds.push((lastPoint.y - y) / (lastPoint.x - x));
     }
 
-    // Calculate weighted average speed
     let weightedSum = 0;
     let weightTotal = 0;
     for (let i = 0; i < averageSpeeds.length; i++) {
@@ -118,20 +124,19 @@
       weightedAverageSpeed = Math.max(0, weightedSum / weightTotal);
     }
 
-    // Calculate next point
     const point = {
       ts: now,
       pos: Math.min(
-        100,
+        targetMaxVal,
         lastPoint.y + weightedAverageSpeed * (0 - lastPoint.x),
       ),
     };
     let message = "";
-    if (point.pos == 100) {
+    if (point.pos >= targetMaxVal) {
       message = "Done!";
     } else if (weightedAverageSpeed > 0) {
       const etaTime =
-        ((100 - lastPoint.y) / weightedAverageSpeed + lastPoint.x) * 1000 +
+        ((targetMaxVal - lastPoint.y) / weightedAverageSpeed + lastPoint.x) * 1000 +
         now.getTime();
       message = friendlyDate(new Date(etaTime), true);
     }
@@ -145,7 +150,7 @@
     paddingBottom: 20,
     paddingHorizontal: 30,
     width: 800,
-    height: 200,
+    height: 250,
   };
 
   function update() {
@@ -162,11 +167,8 @@
   }
 
   function resizeGraph() {
-    LAYOUT.width = visualisation.clientWidth;
-    LAYOUT.height = Math.max(
-      visualisation.style.maxHeight,
-      visualisation.clientHeight,
-    );
+    LAYOUT.width = visualisation.clientWidth || 800;
+    LAYOUT.height = visualisation.clientHeight || 250;
     LAYOUT.plotHeight =
       LAYOUT.height -
       LAYOUT.timeAxisHeight -
@@ -174,20 +176,20 @@
       LAYOUT.paddingTop;
     LAYOUT.plotWidth = LAYOUT.width - 2 * LAYOUT.paddingHorizontal;
 
-    const vbWidth = visualisation.viewBox.baseVal.width;
-    const vbHeight = visualisation.viewBox.baseVal.height;
-    if (vbWidth == LAYOUT.width && vbHeight == LAYOUT.height) return;
-
     visualisation.setAttribute(
       "viewBox",
       `0 0 ${LAYOUT.width} ${LAYOUT.height}`,
     );
+    visualisation.setAttribute("preserveAspectRatio", "none");
+
     setElement(visualisation, "background", "rect", {
       x: 0,
       y: 0,
       width: LAYOUT.width,
       height: LAYOUT.height,
       fill: "var(--elements-bg-color)",
+      rx: 8,
+      ry: 8,
     });
     setElement(visualisation, "axis", "line", {
       x1: 0,
@@ -201,12 +203,12 @@
   function updateNoData() {
     nodata.style.display = data.length == 0 ? "block" : "none";
   }
-  /**
-   * Update the graph
-   * @param {{ts: Date, pos: number}[]} data - Array of data points with timestamp and position
-   */
+
   function updateGraph(data) {
     if (data.length == 0) {
+      ["path-history", "area-history", "path-projection", "eta"].forEach((id) =>
+        removeElement(visualisation, id)
+      );
       return;
     }
 
@@ -214,7 +216,7 @@
     let ETAMessage = "";
     let nextPoint = null;
     if (data.length > 1) {
-      const { point, message } = calculateETA(data);
+      const { point, message } = calculateETA(data, targetMax);
       nextPoint = point;
       ETAMessage = message;
     }
@@ -240,25 +242,90 @@
     if (ETAMessage.length > 0)
       document.title = `${ETAMessage} - Progress Tracker`;
 
-    let maxPos = 10;
+    let maxPos = targetMax;
     for (let index = 0; index < getPointCount(); index++) {
       maxPos = Math.max(maxPos, getPoint(index).pos);
     }
-    const maxTs = new Date().getTime();
-    const minTs = Math.min(
-      maxTs - 1,
-      Math.max(data[0].ts.getTime(), maxTs - 1000 * 30 * 1),
-    );
-    const timeSpan = maxTs - minTs;
+
+    // Dynamic time window maintaining ~5 points in view
+    const nowTs = new Date().getTime();
+    let maxTs = nowTs;
+    if (nextPoint && nextPoint.ts.getTime() > maxTs) {
+      maxTs = nextPoint.ts.getTime();
+    }
+
+    let minTs = nowTs - 30000;
+    if (data.length > 0) {
+      if (data.length >= 5) {
+        const fifthTs = data[data.length - 5].ts.getTime();
+        const span5 = Math.max(5000, maxTs - fifthTs);
+        minTs = fifthTs - span5 * 0.1;
+      } else {
+        const firstTs = data[0].ts.getTime();
+        const span = Math.max(10000, maxTs - firstTs);
+        minTs = firstTs - span * 0.1;
+      }
+    }
+    const timeSpan = Math.max(1000, maxTs - minTs);
 
     function getPointCoordinates(ts, pos) {
       return {
         x:
           LAYOUT.paddingHorizontal +
           (LAYOUT.plotWidth * (ts.getTime() - minTs)) / timeSpan,
-        y: LAYOUT.paddingTop + LAYOUT.plotHeight * (1 - pos / maxPos),
+        y: LAYOUT.paddingTop + LAYOUT.plotHeight * (1 - Math.min(1, Math.max(0, pos / maxPos))),
       };
     }
+
+    // Connect historical points with line path & area fill
+    const historicalCoords = data.map((d) => getPointCoordinates(d.ts, d.pos));
+    if (historicalCoords.length > 1) {
+      let pathD = `M ${historicalCoords[0].x.toFixed(1)},${historicalCoords[0].y.toFixed(1)}`;
+      for (let i = 1; i < historicalCoords.length; i++) {
+        pathD += ` L ${historicalCoords[i].x.toFixed(1)},${historicalCoords[i].y.toFixed(1)}`;
+      }
+      setElement(visualisation, "path-history", "path", {
+        d: pathD,
+        fill: "none",
+        stroke: "white",
+        "stroke-width": "2.5",
+        "stroke-linecap": "round",
+        "stroke-linejoin": "round",
+      });
+
+      const axisY = LAYOUT.height - LAYOUT.timeAxisHeight;
+      const areaD =
+        pathD +
+        ` L ${historicalCoords[historicalCoords.length - 1].x.toFixed(1)},${axisY}` +
+        ` L ${historicalCoords[0].x.toFixed(1)},${axisY} Z`;
+      setElement(visualisation, "area-history", "path", {
+        d: areaD,
+        fill: "rgba(255, 255, 255, 0.08)",
+        stroke: "none",
+      });
+    } else {
+      removeElement(visualisation, "path-history");
+      removeElement(visualisation, "area-history");
+    }
+
+    // Connect projection line to ETA point
+    if (nextPoint && historicalCoords.length > 0) {
+      const lastCoord = historicalCoords[historicalCoords.length - 1];
+      const etaCoord = getPointCoordinates(nextPoint.ts, nextPoint.pos);
+      setElement(visualisation, "path-projection", "line", {
+        x1: lastCoord.x,
+        y1: lastCoord.y,
+        x2: etaCoord.x,
+        y2: etaCoord.y,
+        stroke: "rgba(255, 255, 255, 0.6)",
+        "stroke-width": "2",
+        "stroke-dasharray": "6,4",
+      });
+    } else {
+      removeElement(visualisation, "path-projection");
+    }
+
+    // Draw individual point markers & labels
     let lastTickX = null;
     for (let index = getPointCount() - 1; index >= 0; index--) {
       const { ts, pos } = getPoint(index);
@@ -273,6 +340,10 @@
         continue;
       }
 
+      const formattedLabel = isPercentMode
+        ? `${pos.toFixed(1)}%`
+        : `${pos}/${targetMax}`;
+
       if (index == getPointCount() - 1) {
         setElement(visualisation, `e${index}-circle`, "circle", {
           cx: x,
@@ -285,7 +356,7 @@
           y: y - 10,
           fill: "white",
           "text-anchor": "middle",
-        }).textContent = pos.toFixed(2);
+        }).textContent = formattedLabel;
       } else {
         setElement(visualisation, `e${index}-circle`, "circle", {
           cx: x,
@@ -333,50 +404,80 @@
     }
   }
 
-  // Prevent non-numeric input
   userInput.addEventListener("input", (e) => {
-    let numerical = e.target.value.replace(/[^0-9\.]/g, "");
-    numerical = numerical.replace(/^0+/, "0");
+    let raw = e.target.value.replace(/[^0-9\.]/g, "");
+    const parts = raw.split(".");
+    if (parts.length > 2) {
+      raw = parts[0] + "." + parts.slice(1).join("");
+    }
+    raw = raw.replace(/^0+([0-9])/, "$1");
 
-    let parsedValue = Number(numerical);
-    if (parsedValue > 100) {
-      numerical = userEnteredPos;
+    let parsedValue = raw === "" ? null : Number(raw);
+
+    if (!isEditingDenominator && parsedValue !== null && parsedValue > targetMax) {
+      raw = userEnteredPos !== null ? userEnteredPos.toString() : "";
       parsedValue = userEnteredPos;
     }
-    if (userEnteredPos != parsedValue || e.target.value != numerical) {
-      e.target.value = numerical;
-      userEnteredPos = parsedValue;
+
+    if (e.target.value !== raw) {
+      e.target.value = raw;
     }
+    userEnteredPos = parsedValue;
   });
 
-  /**
-   * Show user input
-   */
   function showInput() {
     inputBox.style.display = "flex";
+    isEditingDenominator = false;
+    unitBtn.style.display = "inline-block";
+    userInput.placeholder = "0";
+    userInput.value = "";
+    userEnteredPos = null;
+    updateUnitBtnUI();
     userInput.focus();
     update();
   }
 
-  /**
-   * Hide user input
-   */
   function hideInput() {
     inputBox.style.display = "none";
     userInput.blur();
-    userEnteredPos = null;
+    isEditingDenominator = false;
+    unitBtn.style.display = "inline-block";
+    userInput.placeholder = "0";
     userInput.value = "";
+    userEnteredPos = null;
     window.scrollTo(0, 0);
     update();
   }
 
-  // Event listeners
-
   addEventListener("keydown", (e) => {
+    const isTyping = document.activeElement === userInput;
+    const inputBoxVisible = inputBox.style.display != "none";
+
+    // Slash '/' triggers denominator selector
+    if (e.key === "/") {
+      if (inputBoxVisible || isTyping) {
+        e.preventDefault();
+        unitBtn.click();
+        return;
+      }
+    }
+
+    // Backspace deletes the last logged progress point if input field is empty or input box closed
+    if (e.key === "Backspace") {
+      const isInputEmpty = userInput.value === "";
+      if (!inputBoxVisible || (isTyping && isInputEmpty)) {
+        if (data.length > 0) {
+          e.preventDefault();
+          data.pop();
+          update();
+        }
+        return;
+      }
+    }
+
     const dismiss = e.key == "Escape";
     const enter = e.key == "Enter";
-    const reset = e.key.toUpperCase() == "R";
-    const inputBoxVisible = inputBox.style.display != "none";
+    const reset = !isTyping && e.key.toUpperCase() == "R";
 
     if (reset) {
       data.length = 0;
@@ -398,16 +499,36 @@
     }
 
     if (enter) {
-      if (userEnteredPos != null) {
-        data.push({ ts: new Date(), pos: userEnteredPos });
+      if (isEditingDenominator) {
+        const newDenom = userEnteredPos;
+        if (newDenom !== null && !isNaN(newDenom) && newDenom > 0 && newDenom !== 100) {
+          targetMax = newDenom;
+          isPercentMode = false;
+        } else {
+          targetMax = 100;
+          isPercentMode = true;
+        }
+        updateUnitBtnUI();
+
+        isEditingDenominator = false;
+        unitBtn.style.display = "inline-block";
+        userInput.value = "";
+        userInput.placeholder = "0";
+        userEnteredPos = null;
+        userInput.focus();
         update();
+      } else {
+        if (userEnteredPos !== null && !isNaN(userEnteredPos)) {
+          data.push({ ts: new Date(), pos: userEnteredPos });
+          update();
+        }
+        hideInput();
       }
-      hideInput();
     }
   });
 
   addEventListener("click", (e) => {
-    if (e.target.tagName != "A") {
+    if (e.target.tagName !== "A" && e.target !== unitBtn && !unitBtn.contains(e.target)) {
       showInput();
       e.preventDefault();
     }
@@ -417,9 +538,11 @@
     update();
   });
   addEventListener("load", () => {
+    updateUnitBtnUI();
     update();
   });
-  update();
+
+  updateUnitBtnUI();
 
   // Fake data for testing
   if (localStorage.getItem("fake") == "true") {
@@ -435,7 +558,7 @@
       data.push({
         ts: new Date(),
         pos: Math.min(
-          100,
+          targetMax,
           last + (delta / 1000) * v * (1 + (Math.random() - 0.5) / 2),
         ),
       });
