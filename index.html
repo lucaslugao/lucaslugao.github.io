@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lucas Lugão</title>
     <meta name="description" content="Personal website of Lucas Lugão.">
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -35,7 +36,9 @@
             --color-text-main: #1a1a1a;
             --color-text-dim: #666666;
             --border-color: #eeeeee;
-            --color-highlight: #FAFF00; /* Vibrant Yellow */
+            --color-highlight: #FFC21A; /* Marigold */
+            --color-highlight-tint: rgba(255, 194, 26, 0.14);
+            --color-mark: #D39C11; /* Marigold deepened for thin marks on white */
             --color-highlight-text: #000000;
         }
 
@@ -45,6 +48,7 @@
                 --color-text-main: #e0e0e0;
                 --color-text-dim: #aaaaaa;
                 --border-color: #333333;
+                --color-mark: var(--color-highlight);
             }
         }
 
@@ -53,6 +57,7 @@
             --color-text-main: #1a1a1a;
             --color-text-dim: #666666;
             --border-color: #eeeeee;
+            --color-mark: #D39C11;
         }
 
         :root[data-theme="dark"] {
@@ -60,6 +65,7 @@
             --color-text-main: #e0e0e0;
             --color-text-dim: #aaaaaa;
             --border-color: #333333;
+            --color-mark: var(--color-highlight);
         }
 
         * {
@@ -103,6 +109,21 @@
             margin-bottom: var(--space-xs);
             text-transform: uppercase;
             letter-spacing: 0.03em;
+        }
+
+        .section h2 {
+            display: flex;
+            align-items: center;
+            gap: var(--space-md);
+        }
+
+        .section h2::before {
+            content: "";
+            width: 7px;
+            height: 7px;
+            background: var(--color-highlight);
+            border-radius: 1px;
+            flex-shrink: 0;
         }
 
         p {
@@ -169,6 +190,63 @@
             padding-bottom: var(--space-xs);
         }
 
+        /* Experience timeline */
+        .timeline {
+            position: relative;
+            padding-left: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-lg);
+        }
+
+        .timeline::before {
+            content: "";
+            position: absolute;
+            left: 4px;
+            top: 8px;
+            bottom: 8px;
+            width: 1px;
+            background: var(--border-color);
+        }
+
+        .job {
+            position: relative;
+            border-radius: 4px;
+            transition: background-color 0.12s ease, box-shadow 0.12s ease;
+        }
+
+        .job:hover {
+            background-color: var(--color-highlight-tint);
+            box-shadow: -6px 0 0 var(--color-highlight-tint), 6px 0 0 var(--color-highlight-tint);
+        }
+
+        .job::before {
+            content: "";
+            position: absolute;
+            left: -20px;
+            top: 6px;
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--color-bg);
+            border: 1.5px solid var(--color-text-dim);
+            box-sizing: border-box;
+            z-index: 1;
+        }
+
+        .job.current::before {
+            background: var(--color-text-main);
+            border-color: var(--color-text-main);
+        }
+
+        .job:not(.current) {
+            opacity: 0.75;
+        }
+
+        .job .item {
+            padding: 0;
+        }
+
         .item-meta {
             color: var(--color-text-dim);
             font-feature-settings: "tnum";
@@ -180,6 +258,10 @@
             .item-meta {
                 margin-left: var(--space-sm);
             }
+        }
+
+        .links a {
+            text-decoration: none;
         }
 
         .links {
@@ -207,8 +289,8 @@
         }
 
         #theme-toggle:hover {
-            border-color: var(--color-text-dim);
-            background-color: var(--border-color);
+            border-color: var(--color-mark);
+            background-color: var(--color-highlight-tint);
         }
 
         #theme-toggle {
@@ -275,39 +357,47 @@
 
     <section class="section">
         <h2>Experience</h2>
-        <ul class="item-list">
-            <li class="item">
-                <div>
-                    <span class="item-title">Google DeepMind</span>
-                    <span class="item-desc"><em>London</em></span>
+        <ul class="item-list timeline">
+            <li class="job current">
+                <div class="item">
+                    <div>
+                        <span class="item-title">Google DeepMind</span>
+                        <span class="item-desc"><em>London</em></span>
+                    </div>
+                    <span class="item-meta">2026&ndash;Present</span>
                 </div>
-                <span class="item-meta">2026&ndash;Present</span>
+                <div class="item-location">Large-Scale Training</div>
             </li>
-            <li class="item-location">Large-Scale Training Infrastructure</li>
-            <li class="item">
-                <div>
-                    <span class="item-title">Google</span>
-                    <span class="item-desc"><em>London</em></span>
+            <li class="job">
+                <div class="item">
+                    <div>
+                        <span class="item-title">Google</span>
+                        <span class="item-desc"><em>London</em></span>
+                    </div>
+                    <span class="item-meta">2022&ndash;2026</span>
                 </div>
-                <span class="item-meta">2022&ndash;2026</span>
+                <div class="item-location">SRE, ML Scheduling</div>
             </li>
-            <li class="item-location">SRE, ML Scheduling</li>
-            <li class="item">
-                <div>
-                    <span class="item-title">Datakalab (acq. Apple)</span>
-                    <span class="item-desc"><em>Paris</em></span>
+            <li class="job">
+                <div class="item">
+                    <div>
+                        <span class="item-title">Datakalab (acq. Apple)</span>
+                        <span class="item-desc"><em>Paris</em></span>
+                    </div>
+                    <span class="item-meta">2018&ndash;2022</span>
                 </div>
-                <span class="item-meta">2018&ndash;2022</span>
+                <div class="item-location">Founding Engineer</div>
             </li>
-            <li class="item-location">Founding Engineer</li>
-            <li class="item">
-                <div>
-                    <span class="item-title">Verily Life Sciences</span>
-                    <span class="item-desc"><em>Mountain View</em></span>
+            <li class="job">
+                <div class="item">
+                    <div>
+                        <span class="item-title">Verily Life Sciences</span>
+                        <span class="item-desc"><em>Mountain View</em></span>
+                    </div>
+                    <span class="item-meta">2018</span>
                 </div>
-                <span class="item-meta">2018</span>
+                <div class="item-location">SWE Intern</div>
             </li>
-            <li class="item-location">SWE Intern</li>
         </ul>
     </section>
 
